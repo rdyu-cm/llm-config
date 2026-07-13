@@ -4,6 +4,19 @@ set -u
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 failures=0
 
+find_python() {
+  for candidate in "${PYTHON:-}" python3 "$HOME"/.local/share/uv/python/cpython-3.*/bin/python3; do
+    if [ -n "$candidate" ] && command -v "$candidate" >/dev/null 2>&1 && \
+       "$candidate" -c 'import tomllib' >/dev/null 2>&1; then
+      echo "$candidate"
+      return
+    fi
+  done
+  return 1
+}
+
+PYTHON=$(find_python || true)
+
 check_command() {
   label=$1
   command_name=$2
@@ -20,13 +33,18 @@ check_command() {
 
 echo "Portable Codex doctor"
 check_command "Codex" codex true
-check_command "Python 3" python3 true
+if [ -n "$PYTHON" ]; then
+  echo "ok      Python 3.11+: $PYTHON"
+else
+  echo "missing Python 3.11+ (required)" >&2
+  failures=$((failures + 1))
+fi
 check_command "Node.js" node true
 check_command "npx" npx true
 check_command "GitHub CLI" gh false
 check_command "Codebase Memory binary" codebase-memory-mcp false
 
-if python3 "$ROOT/scripts/validate.py"; then
+if [ -n "$PYTHON" ] && "$PYTHON" "$ROOT/scripts/validate.py"; then
   echo "ok      repository configuration"
 else
   failures=$((failures + 1))
@@ -34,7 +52,7 @@ fi
 
 if [ -L "$HOME/.codex/config.toml" ] && \
    [ "$(readlink "$HOME/.codex/config.toml")" = "$ROOT/.codex/config.generated.toml" ]; then
-  if python3 "$ROOT/scripts/sync_config.py" \
+  if [ -n "$PYTHON" ] && "$PYTHON" "$ROOT/scripts/sync_config.py" \
     --base "$ROOT/.codex/config.toml" \
     --local "$HOME/.codex/config.local.toml" \
     --output "$ROOT/.codex/config.generated.toml" \
@@ -47,7 +65,7 @@ else
   echo "optional global merged config is not installed"
 fi
 
-if python3 -m unittest discover -s "$ROOT/tests" -p 'test_*.py'; then
+if [ -n "$PYTHON" ] && "$PYTHON" -m unittest discover -s "$ROOT/tests" -p 'test_*.py'; then
   echo "ok      hook contract tests"
 else
   failures=$((failures + 1))

@@ -7,6 +7,20 @@ conflicts=0
 LOCAL_CONFIG="$HOME/.codex/config.local.toml"
 GENERATED_CONFIG="$ROOT/.codex/config.generated.toml"
 
+find_python() {
+  for candidate in "${PYTHON:-}" python3 "$HOME"/.local/share/uv/python/cpython-3.*/bin/python3; do
+    if [ -n "$candidate" ] && command -v "$candidate" >/dev/null 2>&1 && \
+       "$candidate" -c 'import tomllib' >/dev/null 2>&1; then
+      echo "$candidate"
+      return
+    fi
+  done
+  echo "Python 3.11 or newer is required" >&2
+  return 1
+}
+
+PYTHON=$(find_python)
+
 if [ "${1:-}" = "--apply" ]; then
   APPLY=true
 elif [ "${1:-}" != "" ] && [ "${1:-}" != "--dry-run" ]; then
@@ -44,6 +58,8 @@ link_item() {
 
 install_config() {
   target="$HOME/.codex/config.toml"
+  merge_local="$LOCAL_CONFIG"
+  preserve_local=false
 
   if [ -L "$target" ]; then
     current=$(readlink "$target")
@@ -56,21 +72,31 @@ install_config() {
       echo "conflict $target and $LOCAL_CONFIG both exist; merge them manually" >&2
       return 1
     fi
-    if [ "$APPLY" = true ]; then
-      mv "$target" "$LOCAL_CONFIG"
-      echo "local   preserved existing config at $LOCAL_CONFIG"
-    else
+    merge_local="$target"
+    preserve_local=true
+    if [ "$APPLY" = false ]; then
       echo "would   preserve existing config at $LOCAL_CONFIG"
     fi
   fi
 
   if [ "$APPLY" = true ]; then
-    python3 "$ROOT/scripts/sync_config.py" \
+    if ! "$PYTHON" "$ROOT/scripts/sync_config.py" \
       --base "$ROOT/.codex/config.toml" \
-      --local "$LOCAL_CONFIG" \
-      --output "$GENERATED_CONFIG"
+      --local "$merge_local" \
+      --output "$GENERATED_CONFIG"; then
+      return 1
+    fi
+    if [ "$preserve_local" = true ]; then
+      mv "$target" "$LOCAL_CONFIG"
+      echo "local   preserved existing config at $LOCAL_CONFIG"
+    fi
     if [ ! -L "$target" ]; then
-      ln -s "$GENERATED_CONFIG" "$target"
+      if ! ln -s "$GENERATED_CONFIG" "$target"; then
+        if [ "$preserve_local" = true ]; then
+          mv "$LOCAL_CONFIG" "$target"
+        fi
+        return 1
+      fi
       echo "linked  $target -> $GENERATED_CONFIG"
     else
       echo "ok      $target"
@@ -83,8 +109,12 @@ install_config() {
 
 echo "Portable Codex bootstrap ($([ "$APPLY" = true ] && echo apply || echo dry-run))"
 
+if ! install_config; then
+  echo "Config installation failed; no discovery links were changed." >&2
+  exit 1
+fi
+
 link_item "$ROOT/AGENTS.global.md" "$HOME/.codex/AGENTS.md" || conflicts=$((conflicts + 1))
-install_config || conflicts=$((conflicts + 1))
 link_item "$ROOT/.codex/hooks.json" "$HOME/.codex/hooks.json" || conflicts=$((conflicts + 1))
 link_item "$ROOT/.codex/hooks" "$HOME/.codex/hooks" || conflicts=$((conflicts + 1))
 link_item "$ROOT/.codex/agents" "$HOME/.codex/agents" || conflicts=$((conflicts + 1))

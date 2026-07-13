@@ -71,12 +71,21 @@ def render(data: dict) -> str:
         "",
     ]
 
-    def emit_table(table: dict, path: tuple[str, ...], *, header: bool) -> None:
-        values = [(name, value) for name, value in table.items() if not isinstance(value, dict)]
+    def is_array_of_tables(value: object) -> bool:
+        return isinstance(value, list) and bool(value) and all(isinstance(item, dict) for item in value)
+
+    def emit_table(table: dict, path: tuple[str, ...], *, header: bool, array: bool = False) -> None:
+        values = [
+            (name, value)
+            for name, value in table.items()
+            if not isinstance(value, dict) and not is_array_of_tables(value)
+        ]
         children = [(name, value) for name, value in table.items() if isinstance(value, dict)]
+        arrays = [(name, value) for name, value in table.items() if is_array_of_tables(value)]
 
         if header:
-            lines.append("[" + ".".join(key(part) for part in path) + "]")
+            brackets = "[[{}]]" if array else "[{}]"
+            lines.append(brackets.format(".".join(key(part) for part in path)))
         for name, value in values:
             lines.append(f"{key(name)} = {scalar(value)}")
         if header or values:
@@ -84,6 +93,10 @@ def render(data: dict) -> str:
 
         for name, child in children:
             emit_table(child, (*path, name), header=True)
+
+        for name, items in arrays:
+            for item in items:
+                emit_table(item, (*path, name), header=True, array=True)
 
     emit_table(data, (), header=False)
     return "\n".join(lines).rstrip() + "\n"

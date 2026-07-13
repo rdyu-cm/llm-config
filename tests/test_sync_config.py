@@ -29,6 +29,25 @@ class SyncConfigTests(unittest.TestCase):
             with path.open("rb") as handle:
                 self.assertEqual(tomllib.load(handle), config)
 
+    def test_render_round_trips_nested_arrays_of_tables(self):
+        config = {
+            "hooks": {
+                "SessionStart": [
+                    {
+                        "matcher": "startup|resume",
+                        "hooks": [{"type": "command", "command": "echo ready"}],
+                    }
+                ],
+                "state": {"example": {"trusted_hash": "sha256:test"}},
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.toml"
+            path.write_text(render(config), encoding="utf-8")
+            with path.open("rb") as handle:
+                self.assertEqual(tomllib.load(handle), config)
+
     def test_runtime_overlay_keeps_only_hook_trust_state(self):
         config = {
             "hooks": {"state": {"example": {"trusted_hash": "sha256:test"}}},

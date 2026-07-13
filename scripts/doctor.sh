@@ -65,7 +65,9 @@ else
   echo "optional global merged config is not installed"
 fi
 
-if [ -n "$PYTHON" ] && "$PYTHON" -m unittest discover -s "$ROOT/tests" -p 'test_*.py'; then
+if [ -n "$PYTHON" ] && (
+  cd "$ROOT" && "$PYTHON" -m unittest discover -s tests -p 'test_*.py'
+); then
   echo "ok      hook contract tests"
 else
   failures=$((failures + 1))

@@ -1,0 +1,238 @@
+version = 1
+workspace_policy = "one_writer_per_worktree"
+
+[[components]]
+name = "global"
+kind = "instructions"
+path = "AGENTS.global.md"
+classification = "supported"
+
+[[components]]
+name = "agentic-actions-auditor"
+kind = "skill"
+path = "skills/agentic-actions-auditor"
+classification = "supported"
+
+[[components]]
+name = "brainstorming"
+kind = "skill"
+path = "skills/brainstorming"
+classification = "supported"
+
+[[components]]
+name = "cli-creator"
+kind = "skill"
+path = "skills/cli-creator"
+classification = "supported"
+
+[[components]]
+name = "composition-patterns"
+kind = "skill"
+path = "skills/composition-patterns"
+classification = "supported"
+
+[[components]]
+name = "differential-review"
+kind = "skill"
+path = "skills/differential-review"
+classification = "supported"
+
+[[components]]
+name = "finishing-a-development-branch"
+kind = "skill"
+path = "skills/finishing-a-development-branch"
+classification = "supported"
+
+[[components]]
+name = "gh-address-comments"
+kind = "skill"
+path = "skills/gh-address-comments"
+classification = "supported"
+
+[[components]]
+name = "gh-fix-ci"
+kind = "skill"
+path = "skills/gh-fix-ci"
+classification = "supported"
+
+[[components]]
+name = "impeccable"
+kind = "skill"
+path = "skills/impeccable"
+classification = "supported"
+
+[[components]]
+name = "insecure-defaults"
+kind = "skill"
+path = "skills/insecure-defaults"
+classification = "supported"
+
+[[components]]
+name = "modern-python"
+kind = "skill"
+path = "skills/modern-python"
+classification = "supported"
+
+[[components]]
+name = "playwright"
+kind = "skill"
+path = "skills/playwright"
+classification = "supported"
+
+[[components]]
+name = "property-based-testing"
+kind = "skill"
+path = "skills/property-based-testing"
+classification = "supported"
+
+[[components]]
+name = "react-best-practices"
+kind = "skill"
+path = "skills/react-best-practices"
+classification = "supported"
+
+[[components]]
+name = "receiving-code-review"
+kind = "skill"
+path = "skills/receiving-code-review"
+classification = "supported"
+
+[[components]]
+name = "requesting-code-review"
+kind = "skill"
+path = "skills/requesting-code-review"
+classification = "supported"
+
+[[components]]
+name = "sharp-edges"
+kind = "skill"
+path = "skills/sharp-edges"
+classification = "supported"
+
+[[components]]
+name = "supply-chain-risk-auditor"
+kind = "skill"
+path = "skills/supply-chain-risk-auditor"
+classification = "supported"
+
+[[components]]
+name = "systematic-debugging"
+kind = "skill"
+path = "skills/systematic-debugging"
+classification = "supported"
+
+[[components]]
+name = "test-driven-development"
+kind = "skill"
+path = "skills/test-driven-development"
+classification = "supported"
+
+[[components]]
+name = "verification-before-completion"
+kind = "skill"
+path = "skills/verification-before-completion"
+classification = "supported"
+
+[[components]]
+name = "writing-plans"
+kind = "skill"
+path = "skills/writing-plans"
+classification = "supported"
+
+[[components]]
+name = "browser_debugger"
+kind = "agent"
+path = ".codex/agents/browser-debugger.toml"
+classification = "supported"
+
+[[components]]
+name = "docs_researcher"
+kind = "agent"
+path = ".codex/agents/docs-researcher.toml"
+classification = "supported"
+
+[[components]]
+name = "reviewer"
+kind = "agent"
+path = ".codex/agents/reviewer.toml"
+classification = "supported"
+
+[[components]]
+name = "security_reviewer"
+kind = "agent"
+path = ".codex/agents/security-reviewer.toml"
+classification = "supported"
+
+[[components]]
+name = "planner"
+kind = "agent"
+path = ".codex/agents/planner.toml"
+classification = "supported"
+
+[[components]]
+name = "implementer"
+kind = "agent"
+path = ".codex/agents/implementer.toml"
+classification = "supported"
+
+[[components]]
+name = "portable-hooks"
+kind = "hook"
+path = ".codex/hooks.json"
+classification = "preflight-required"
+
+[[components]]
+name = "openaiDeveloperDocs"
+kind = "mcp"
+path = ".codex/config.toml"
+classification = "preflight-required"
+
+[[components]]
+name = "context7"
+kind = "mcp"
+path = ".codex/config.toml"
+classification = "preflight-required"
+
+[[components]]
+name = "github"
+kind = "mcp"
+path = ".codex/config.toml"
+classification = "preflight-required"
+
+[[components]]
+name = "codebase_memory"
+kind = "mcp"
+path = ".codex/config.toml"
+classification = "preflight-required"
+
+[[components]]
+name = "minimal"
+kind = "profile"
+path = "profiles/minimal.config.toml"
+classification = "supported"
+
+[[components]]
+name = "frontend"
+kind = "profile"
+path = "profiles/frontend.config.toml"
+classification = "supported"
+
+[[components]]
+name = "security"
+kind = "profile"
+path = "profiles/security.config.toml"
+classification = "supported"
+
+[[components]]
+name = "full"
+kind = "profile"
+path = "profiles/full.config.toml"
+classification = "supported"
+
+[[components]]
+name = "superpowers"
+kind = "plugin"
+path = "plugins.lock.toml"
+classification = "supported"
+pin = "d884ae04edebef577e82ff7c4e143debd0bbec99"
+

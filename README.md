@@ -112,8 +112,23 @@ GITHUB_PAT_TOKEN=... codex --profile full
 - `docs_researcher`: read-only primary-source and version-sensitive API research.
 - `browser_debugger`: reproduces browser behavior and writes only diagnostic artifacts.
 - `security_reviewer`: read-only dispatcher for the narrow Trail of Bits review skills.
+- `planner`: read-only planning role pinned to `gpt-5.6-sol`.
+- `implementer`: bounded workspace-writing role pinned to `gpt-5.6-terra`.
 
-Agents inherit the current model. This avoids pinning a model name that will become stale.
+The four specialist agents inherit the current model. Planner and implementer are intentionally
+pinned for harness role routing; capability preflight must reject an unavailable pin rather than
+silently substitute another model.
+
+## Harness capability catalog
+
+`capability-bundle.toml` catalogs the portable instructions, profiles, skills, agents, hooks, MCP
+definitions, and plugin pin that `codex-harness` may admit for a run. It contains paths and immutable
+references only. Authentication, local overlays, generated config, hook trust state, caches, and
+transcripts remain outside the bundle.
+
+The catalog records `one_writer_per_worktree` as the default writer-isolation policy. The harness
+serializes or rejects concurrent writers until its executor can allocate a separate disposable Git
+worktree or clone for each one.
 
 ## Hooks
 

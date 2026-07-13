@@ -4,6 +4,8 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 APPLY=false
 conflicts=0
+LOCAL_CONFIG="$HOME/.codex/config.local.toml"
+GENERATED_CONFIG="$ROOT/.codex/config.generated.toml"
 
 if [ "${1:-}" = "--apply" ]; then
   APPLY=true
@@ -40,10 +42,49 @@ link_item() {
   fi
 }
 
+install_config() {
+  target="$HOME/.codex/config.toml"
+
+  if [ -L "$target" ]; then
+    current=$(readlink "$target")
+    if [ "$current" != "$GENERATED_CONFIG" ]; then
+      echo "conflict $target -> $current" >&2
+      return 1
+    fi
+  elif [ -e "$target" ]; then
+    if [ -e "$LOCAL_CONFIG" ]; then
+      echo "conflict $target and $LOCAL_CONFIG both exist; merge them manually" >&2
+      return 1
+    fi
+    if [ "$APPLY" = true ]; then
+      mv "$target" "$LOCAL_CONFIG"
+      echo "local   preserved existing config at $LOCAL_CONFIG"
+    else
+      echo "would   preserve existing config at $LOCAL_CONFIG"
+    fi
+  fi
+
+  if [ "$APPLY" = true ]; then
+    python3 "$ROOT/scripts/sync_config.py" \
+      --base "$ROOT/.codex/config.toml" \
+      --local "$LOCAL_CONFIG" \
+      --output "$GENERATED_CONFIG"
+    if [ ! -L "$target" ]; then
+      ln -s "$GENERATED_CONFIG" "$target"
+      echo "linked  $target -> $GENERATED_CONFIG"
+    else
+      echo "ok      $target"
+    fi
+  else
+    echo "would   merge portable base with $LOCAL_CONFIG"
+    echo "would   $target -> $GENERATED_CONFIG"
+  fi
+}
+
 echo "Portable Codex bootstrap ($([ "$APPLY" = true ] && echo apply || echo dry-run))"
 
 link_item "$ROOT/AGENTS.global.md" "$HOME/.codex/AGENTS.md" || conflicts=$((conflicts + 1))
-link_item "$ROOT/.codex/config.toml" "$HOME/.codex/config.toml" || conflicts=$((conflicts + 1))
+install_config || conflicts=$((conflicts + 1))
 link_item "$ROOT/.codex/hooks.json" "$HOME/.codex/hooks.json" || conflicts=$((conflicts + 1))
 link_item "$ROOT/.codex/hooks" "$HOME/.codex/hooks" || conflicts=$((conflicts + 1))
 link_item "$ROOT/.codex/agents" "$HOME/.codex/agents" || conflicts=$((conflicts + 1))

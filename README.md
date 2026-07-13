@@ -2,7 +2,7 @@
 
 An audited, repository-contained Codex setup for implementation, planning, debugging, review, frontend work, browser automation, and security analysis.
 
-The repository is the source of truth. `scripts/bootstrap.sh` or `scripts/bootstrap.ps1` links it into Codex's global discovery paths without copying secrets or silently overwriting an existing setup.
+The repository is the source of truth. `scripts/bootstrap.sh` links it into Codex's global discovery paths without copying secrets or silently discarding an existing setup. On first install, an existing `~/.codex/config.toml` becomes the machine-local overlay at `~/.codex/config.local.toml`. The tracked portable base overrides matching local keys, and the generated merged file stays ignored by Git.
 
 ## Quick start
 
@@ -27,7 +27,8 @@ Restart Codex after applying the bootstrap. Open `/hooks` once to review and tru
 - `AGENTS.md`: instructions for maintaining this repository itself.
 - `skills/`: canonical, vendored skill library.
 - `.agents/skills`: repo-local discovery link to `skills/`.
-- `.codex/config.toml`: global defaults and MCP definitions.
+- `.codex/config.toml`: tracked portable defaults and MCP definitions.
+- `.codex/config.generated.toml`: ignored merged output used by Codex after bootstrap.
 - `.codex/agents/`: four narrow custom agents.
 - `.codex/hooks.json` and `.codex/hooks/`: deterministic lifecycle guardrails.
 - `profiles/`: minimal, frontend, security, and full configuration overlays.
@@ -131,3 +132,4 @@ The update check compares every pinned commit with upstream `HEAD` and exits non
 
 Keep credentials in environment variables or a local ignored `.env`. Do not add Codex authentication state, transcripts, MCP OAuth data, Codebase Memory indexes, caches, browser output, or local overrides to this repository.
 
+Machine-specific model choices, project trust entries, and TUI state belong in `~/.codex/config.local.toml`. Codex-owned hook trust hashes remain in the ignored generated config and are preserved when it is regenerated. Re-run `./scripts/bootstrap.sh --apply` after pulling portable config changes; it regenerates the ignored merged config. Portable values win when both layers define the same key.

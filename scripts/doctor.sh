@@ -32,6 +32,21 @@ else
   failures=$((failures + 1))
 fi
 
+if [ -L "$HOME/.codex/config.toml" ] && \
+   [ "$(readlink "$HOME/.codex/config.toml")" = "$ROOT/.codex/config.generated.toml" ]; then
+  if python3 "$ROOT/scripts/sync_config.py" \
+    --base "$ROOT/.codex/config.toml" \
+    --local "$HOME/.codex/config.local.toml" \
+    --output "$ROOT/.codex/config.generated.toml" \
+    --check; then
+    echo "ok      global config uses portable base plus local overlay"
+  else
+    failures=$((failures + 1))
+  fi
+else
+  echo "optional global merged config is not installed"
+fi
+
 if python3 -m unittest discover -s "$ROOT/tests" -p 'test_*.py'; then
   echo "ok      hook contract tests"
 else
@@ -57,4 +72,3 @@ if [ "$failures" -ne 0 ]; then
 fi
 
 echo "doctor passed"
-

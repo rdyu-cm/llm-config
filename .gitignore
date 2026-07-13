@@ -8,4 +8,4 @@ __pycache__/
 .pytest_cache/
 .codebase-memory/
 output/
-
+.codex/config.generated.toml

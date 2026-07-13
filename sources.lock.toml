@@ -1,0 +1,59 @@
+version = 1
+audited_at = "2026-07-13"
+
+[[sources]]
+name = "openai-skills"
+repository = "https://github.com/openai/skills"
+commit = "49f948faa9258a0c61caceaf225e179651397431"
+license = "per-skill LICENSE.txt"
+items = ["cli-creator", "gh-address-comments", "gh-fix-ci", "playwright"]
+
+[[sources]]
+name = "superpowers"
+repository = "https://github.com/obra/superpowers"
+commit = "d884ae04edebef577e82ff7c4e143debd0bbec99"
+license = "MIT"
+items = ["brainstorming", "writing-plans", "test-driven-development", "systematic-debugging", "verification-before-completion", "requesting-code-review", "receiving-code-review", "finishing-a-development-branch"]
+
+[[sources]]
+name = "vercel-agent-skills"
+repository = "https://github.com/vercel-labs/agent-skills"
+commit = "f8a72b9603728bb92a217a879b7e62e43ad76c81"
+license = "MIT"
+items = ["react-best-practices", "composition-patterns"]
+
+[[sources]]
+name = "trailofbits-skills"
+repository = "https://github.com/trailofbits/skills"
+commit = "cfe5d7b1619e47fb5b38b7e2561dad7e5f1e89af"
+license = "CC-BY-SA-4.0"
+items = ["differential-review", "insecure-defaults", "sharp-edges", "property-based-testing", "supply-chain-risk-auditor", "agentic-actions-auditor", "modern-python"]
+
+[[sources]]
+name = "impeccable"
+repository = "https://github.com/pbakaus/impeccable"
+commit = "f2049c2b76383b444bf30cd6184f7d49a6c580d1"
+license = "Apache-2.0"
+items = ["impeccable"]
+
+[[sources]]
+name = "github-mcp-server"
+repository = "https://github.com/github/github-mcp-server"
+commit = "c36e4e4493c76eafe2c1a9cbc5272e8eede29189"
+license = "MIT"
+items = ["remote-server"]
+
+[[sources]]
+name = "context7"
+repository = "https://github.com/upstash/context7"
+commit = "eb7ac502f6e83692363375d3088d550afa298a60"
+license = "MIT"
+items = ["remote-mcp"]
+
+[[sources]]
+name = "codebase-memory-mcp"
+repository = "https://github.com/DeusData/codebase-memory-mcp"
+commit = "2469ecc3a7a2f80debe296e1f17a1efcfdb9450c"
+license = "MIT"
+items = ["npm:codebase-memory-mcp@0.8.1"]
+

@@ -1,0 +1,41 @@
+# Portable personal defaults. Project-level config files can override these.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[features]
+hooks = true
+
+[agents]
+max_threads = 4
+max_depth = 1
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+enabled = true
+required = false
+default_tools_approval_mode = "auto"
+
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
+enabled = true
+required = false
+default_tools_approval_mode = "auto"
+
+# Enable after exporting a least-privilege GITHUB_PAT_TOKEN.
+[mcp_servers.github]
+url = "https://api.githubcopilot.com/mcp/"
+bearer_token_env_var = "GITHUB_PAT_TOKEN"
+enabled = false
+required = false
+default_tools_approval_mode = "writes"
+
+# The full profile enables this pinned, local code-intelligence server.
+[mcp_servers.codebase_memory]
+command = "npx"
+args = ["-y", "codebase-memory-mcp@0.8.1"]
+enabled = false
+required = false
+startup_timeout_sec = 30
+tool_timeout_sec = 90
+default_tools_approval_mode = "auto"
+

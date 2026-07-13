@@ -1,0 +1,13 @@
+# Frontend work uses the Playwright CLI skill; no browser MCP is loaded.
+[mcp_servers.openaiDeveloperDocs]
+enabled = true
+
+[mcp_servers.context7]
+enabled = true
+
+[mcp_servers.github]
+enabled = false
+
+[mcp_servers.codebase_memory]
+enabled = false
+

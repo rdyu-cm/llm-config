@@ -186,24 +186,30 @@ name = "openaiDeveloperDocs"
 kind = "mcp"
 path = ".codex/config.toml"
 classification = "preflight-required"
+enabled_tools = ["search_openai_docs", "fetch_openai_doc"]
+preflight_safe = true
 
 [[components]]
 name = "context7"
 kind = "mcp"
 path = ".codex/config.toml"
 classification = "preflight-required"
+enabled_tools = ["resolve-library-id", "query-docs"]
+preflight_safe = true
 
 [[components]]
 name = "github"
 kind = "mcp"
 path = ".codex/config.toml"
 classification = "preflight-required"
+enabled_tools = ["get_file_contents", "search_code", "list_commits", "pull_request_read"]
 
 [[components]]
 name = "codebase_memory"
 kind = "mcp"
 path = ".codex/config.toml"
 classification = "preflight-required"
+enabled_tools = ["search", "index_repository"]
 
 [[components]]
 name = "minimal"
@@ -233,6 +239,5 @@ classification = "supported"
 name = "superpowers"
 kind = "plugin"
 path = "plugins.lock.toml"
-classification = "supported"
 pin = "d884ae04edebef577e82ff7c4e143debd0bbec99"
-
+classification = "unsupported-headless"

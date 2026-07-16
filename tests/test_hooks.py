@@ -55,6 +55,19 @@ class SecretGuardTests(unittest.TestCase):
         self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
 
 
+class SessionContextTests(unittest.TestCase):
+    def test_describes_codebase_memory_without_profile_specific_inference(self) -> None:
+        output = run_hook("session_context.py", "")
+        context = output["hookSpecificOutput"]["additionalContext"]
+
+        self.assertIn(
+            "Codebase Memory is configured in the portable config and should be used when its tools are surfaced; "
+            "otherwise use rg.",
+            context,
+        )
+        self.assertNotIn("configured through the full profile", context)
+
+
 if __name__ == "__main__":
     unittest.main()
 

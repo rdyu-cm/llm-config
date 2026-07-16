@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import sys
 
 
@@ -14,10 +13,10 @@ def main() -> int:
     except (json.JSONDecodeError, OSError):
         pass
 
-    graph = "available" if shutil.which("codebase-memory-mcp") else "configured through the full profile"
     context = (
         "Portable Codex config is active. Keep changes surgical and verify before completion. "
-        f"Codebase Memory is {graph}; prefer graph discovery when its tools are surfaced, otherwise use rg."
+        "Codebase Memory is configured in the portable config and should be used when its tools are surfaced; "
+        "otherwise use rg."
     )
     print(
         json.dumps(

@@ -176,6 +176,36 @@ path = ".codex/agents/implementer.toml"
 classification = "supported"
 
 [[components]]
+name = "implementer_fast"
+kind = "agent"
+path = ".codex/agents/implementer_fast.toml"
+classification = "supported"
+
+[[components]]
+name = "implementer_standard"
+kind = "agent"
+path = ".codex/agents/implementer_standard.toml"
+classification = "supported"
+
+[[components]]
+name = "implementer_deep"
+kind = "agent"
+path = ".codex/agents/implementer_deep.toml"
+classification = "supported"
+
+[[components]]
+name = "reviewer_standard"
+kind = "agent"
+path = ".codex/agents/reviewer_standard.toml"
+classification = "supported"
+
+[[components]]
+name = "reviewer_deep"
+kind = "agent"
+path = ".codex/agents/reviewer_deep.toml"
+classification = "supported"
+
+[[components]]
 name = "portable-hooks"
 kind = "hook"
 path = ".codex/hooks.json"

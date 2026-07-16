@@ -31,7 +31,11 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **2. Dispatch code reviewer subagent:**
 
-Dispatch a `general-purpose` subagent, filling the template at [code-reviewer.md](code-reviewer.md)
+On Codex, dispatch `reviewer_standard` by default and use `reviewer_deep` for
+broad, subtle, security-sensitive, concurrency-sensitive, or whole-branch
+changes. On another platform, dispatch a `general-purpose` subagent with an
+explicit model appropriate to the same risk. Fill the template at
+[code-reviewer.md](code-reviewer.md).
 
 **Placeholders:**
 - `{DESCRIPTION}` - Brief summary of what you built

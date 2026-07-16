@@ -46,6 +46,31 @@ class CapabilityBundleTests(unittest.TestCase):
         self.assertEqual(planner["sandbox_mode"], "read-only")
         self.assertEqual(implementer["sandbox_mode"], "workspace-write")
 
+    def test_superpowers_tier_agents_pin_models_reasoning_and_sandboxes(self):
+        expected = {
+            "implementer_fast": ("gpt-5.6-terra", "medium", "workspace-write"),
+            "implementer_standard": ("gpt-5.6-sol", "medium", "workspace-write"),
+            "implementer_deep": ("gpt-5.6-sol", "high", "workspace-write"),
+            "reviewer_standard": ("gpt-5.6-sol", "medium", "read-only"),
+            "reviewer_deep": ("gpt-5.6-sol", "high", "read-only"),
+        }
+
+        with (ROOT / "capability-bundle.toml").open("rb") as handle:
+            catalog = tomllib.load(handle)
+        catalog_agents = {
+            item["name"] for item in catalog["components"] if item["kind"] == "agent"
+        }
+
+        for name, (model, effort, sandbox) in expected.items():
+            with (ROOT / ".codex" / "agents" / f"{name}.toml").open("rb") as handle:
+                agent = tomllib.load(handle)
+            self.assertEqual(agent["name"], name)
+            self.assertEqual(agent["model"], model)
+            self.assertEqual(agent["model_reasoning_effort"], effort)
+            self.assertEqual(agent["sandbox_mode"], sandbox)
+            self.assertIn("task prompt", agent["developer_instructions"])
+            self.assertIn(name, catalog_agents)
+
 
 if __name__ == "__main__":
     unittest.main()

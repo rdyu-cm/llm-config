@@ -29,7 +29,7 @@ Restart Codex after applying the bootstrap. Open `/hooks` once to review and tru
 - `.agents/skills`: repo-local discovery link to `skills/`.
 - `.codex/config.toml`: tracked portable defaults and MCP definitions.
 - `.codex/config.generated.toml`: ignored merged output used by Codex after bootstrap.
-- `.codex/agents/`: four narrow custom agents.
+- `.codex/agents/`: narrow custom agents and Superpowers model tiers.
 - `.codex/hooks.json` and `.codex/hooks/`: deterministic lifecycle guardrails.
 - `profiles/`: minimal, frontend, security, and full configuration overlays.
 - `sources.lock.toml`: audited upstream commits and licenses.
@@ -118,6 +118,12 @@ GITHUB_PAT_TOKEN=... codex --profile full
 The four specialist agents inherit the current model. Planner and implementer are intentionally
 pinned for harness role routing; capability preflight must reject an unavailable pin rather than
 silently substitute another model.
+
+Superpowers implementation and review dispatches use five model-tier agents. Fast implementation
+uses `implementer_fast`; integration work uses `implementer_standard`; broad design-sensitive work
+uses `implementer_deep`; routine review uses `reviewer_standard`; subtle or whole-branch review uses
+`reviewer_deep`. Their developer instructions stay intentionally thin so the complete Superpowers
+task prompt remains unchanged.
 
 ## Harness capability catalog
 

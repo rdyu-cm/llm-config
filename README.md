@@ -86,7 +86,7 @@ Base configuration:
 - `openaiDeveloperDocs`: enabled; authoritative OpenAI product and API documentation.
 - `context7`: enabled; current third-party library documentation. `CONTEXT7_API_KEY` is optional and improves rate limits.
 - `github`: configured against GitHub's hosted MCP endpoint but disabled until a least-privilege `GITHUB_PAT_TOKEN` is exported.
-- `codebase_memory`: pinned to `codebase-memory-mcp@0.8.1` and disabled in the base profile. Security and full profiles enable it through `npx`.
+- `codebase_memory`: pinned to `codebase-memory-mcp@0.8.1` and enabled by default through `npx`. Minimal and frontend profiles disable it explicitly.
 
 GitHub write-capable tools use the `writes` approval mode. Do not commit PATs or enable GitHub MCP without reviewing token scopes.
 

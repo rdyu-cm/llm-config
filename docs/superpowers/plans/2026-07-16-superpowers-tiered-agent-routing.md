@@ -462,12 +462,12 @@ git diff --check
 Then, from `../codex-harness`, run:
 
 ```bash
-UV_CACHE_DIR=.uv-cache uv run --extra dev pytest tests/unit/capabilities/test_preflight.py -q
+UV_CACHE_DIR=.uv-cache uv run --group dev pytest tests/unit/capabilities/test_preflight.py -q
 ```
 
 Expected: repository validation reports 11 agents; all unit tests pass; doctor reports `doctor passed`; `git diff --check` emits no output.
-The existing harness model-preflight tests pass, confirming unavailable pinned
-models still fail instead of falling back.
+The existing harness model-preflight tests pass under the declared `dev` dependency group,
+confirming unavailable pinned models still fail instead of falling back.
 
 - [ ] **Step 9: Commit the Superpowers routing changes**
 

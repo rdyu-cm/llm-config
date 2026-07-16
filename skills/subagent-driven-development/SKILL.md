@@ -112,9 +112,9 @@ capable available model, not the session default.
 diff's size, complexity, and risk. A small mechanical diff does not need the
 most capable model; a subtle concurrency change does.
 
-**Always specify the model explicitly when dispatching a subagent.** An
-omitted model inherits your session's model — often the most capable and
-most expensive — which silently defeats this section.
+**When dispatching a general-purpose subagent, always specify the model explicitly.**
+An omitted model inherits your session's model — often the most capable and
+most expensive — which silently defeats this section. Named Codex agents get their model and reasoning settings from their TOML definitions; do not override them in the dispatch.
 
 **Turn count beats token price.** Wall-clock and context cost scale with how
 many turns a subagent takes, and the cheapest models routinely take 2-3× the

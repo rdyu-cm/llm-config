@@ -169,7 +169,8 @@ Subagent ([AGENT]):
 - `[AGENT]` — REQUIRED on Codex: `reviewer_standard` for a small or routine
   task review, otherwise `reviewer_deep`. On other platforms, use
   `general-purpose` and supply `[MODEL]` explicitly.
-- `[MODEL]` — REQUIRED: reviewer model per SKILL.md Model Selection
+- `[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a
+  named Codex custom agent; choose per SKILL.md Model Selection.
 - `[BRIEF_FILE]` — REQUIRED: the task brief file (`scripts/task-brief PLAN N`
   prints the path; same file the implementer worked from)
 - `[GLOBAL_CONSTRAINTS]` — the binding requirements copied verbatim from

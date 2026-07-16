@@ -84,24 +84,43 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
         )
         final_reviewer = self.read("skills/requesting-code-review/code-reviewer.md")
 
-        self.assertIn("[AGENT]", implementer)
-        self.assertIn("implementer_fast", implementer)
         self.assertIn(
-            "[MODEL — REQUIRED on platforms without Codex custom-agent routing;",
+            "Subagent ([AGENT]):\n"
+            '  description: "Implement Task N: [task name]"\n'
+            "  model: [MODEL — REQUIRED on platforms without Codex "
+            "custom-agent routing;\n"
+            "         choose per SKILL.md Model Selection]\n"
+            "  prompt: |\n",
             implementer,
         )
+        self.assertIn("implementer_fast", implementer)
         self.assertIn(
             "On other platforms, use `general-purpose` and supply `[MODEL]` explicitly.",
             implementer,
         )
-        self.assertIn("[AGENT]", task_reviewer)
+        self.assertIn(
+            "Subagent ([AGENT]):\n"
+            '  description: "Review Task N (spec + quality)"\n'
+            "  model: [MODEL — REQUIRED on platforms without Codex "
+            "custom-agent routing;\n"
+            "         choose per SKILL.md Model Selection]\n"
+            "  prompt: |\n",
+            task_reviewer,
+        )
         self.assertIn("reviewer_standard", task_reviewer)
         self.assertIn(
             "[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a\n"
             "  named Codex custom agent; choose per SKILL.md Model Selection.",
             task_reviewer,
         )
-        self.assertIn("[AGENT]", final_reviewer)
+        self.assertIn(
+            "Subagent ([AGENT]):\n"
+            '  description: "Review code changes"\n'
+            "  model: [MODEL — REQUIRED on platforms without Codex "
+            "custom-agent routing]\n"
+            "  prompt: |\n",
+            final_reviewer,
+        )
         self.assertIn("reviewer_deep", final_reviewer)
         self.assertIn(
             "[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a\n"

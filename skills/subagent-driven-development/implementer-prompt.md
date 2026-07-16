@@ -3,10 +3,10 @@
 Use this template when dispatching an implementer subagent.
 
 ```
-Subagent (general-purpose):
+Subagent ([AGENT]):
   description: "Implement Task N: [task name]"
-  model: [MODEL — REQUIRED: choose per SKILL.md Model Selection; an omitted
-         model silently inherits the session's most expensive one]
+  model: [MODEL — REQUIRED on platforms without Codex custom-agent routing;
+         choose per SKILL.md Model Selection]
   prompt: |
     You are implementing Task N: [task name]
 
@@ -137,3 +137,8 @@ Subagent (general-purpose):
     Use BLOCKED if you cannot complete the task. Use NEEDS_CONTEXT if you need
     information that wasn't provided. Never silently produce work you're unsure about.
 ```
+
+**Dispatch placeholders:**
+- `[AGENT]` — REQUIRED on Codex: `implementer_fast`,
+  `implementer_standard`, or `implementer_deep` per SKILL.md Model Selection.
+  On other platforms, use `general-purpose` and supply `[MODEL]` explicitly.

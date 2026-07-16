@@ -129,6 +129,27 @@ that implementer. Single-file mechanical fixes also take the cheapest tier.
 - Touches multiple files with integration concerns → standard model
 - Requires design judgment or broad codebase understanding → most capable model
 
+### Codex Agent Tiers
+
+On Codex, select the named custom agent instead of relying on session-model
+inheritance:
+
+| Work | Codex agent | Model and reasoning |
+| --- | --- | --- |
+| Complete specification, isolated change, one or two files | `implementer_fast` | `gpt-5.6-terra`, medium |
+| Multi-file integration, pattern matching, or debugging | `implementer_standard` | `gpt-5.6-sol`, medium |
+| Broad architectural context or substantial design judgment | `implementer_deep` | `gpt-5.6-sol`, high |
+| Small or routine task review | `reviewer_standard` | `gpt-5.6-sol`, medium |
+| Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer_deep` | `gpt-5.6-sol`, high |
+
+The final whole-branch review always uses `reviewer_deep`. If an implementer
+reports that the task needs more reasoning, redispatch once at the next
+stronger implementer tier with the missing context; never repeat the same
+underpowered dispatch unchanged. If a required Codex agent is unavailable,
+report it and stop before dispatch rather than silently inheriting the session
+model. On non-Codex platforms, keep using a general-purpose subagent with the
+explicit model selected by the policy above.
+
 ## Handling Implementer Status
 
 Implementer subagents report one of four statuses. Handle each appropriately:
@@ -140,8 +161,8 @@ Implementer subagents report one of four statuses. Handle each appropriately:
 **NEEDS_CONTEXT:** The implementer needs information that wasn't provided. Provide the missing context and re-dispatch.
 
 **BLOCKED:** The implementer cannot complete the task. Assess the blocker:
-1. If it's a context problem, provide more context and re-dispatch with the same model
-2. If the task requires more reasoning, re-dispatch with a more capable model
+1. If it's a context problem, provide more context and re-dispatch with the same tier
+2. If the task requires more reasoning, re-dispatch once at the next stronger implementer tier
 3. If the task is too large, break it into smaller pieces
 4. If the plan itself is wrong, escalate to the human
 

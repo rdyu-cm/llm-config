@@ -8,10 +8,10 @@ code quality.
 more, nothing less) and is well-built (clean, tested, maintainable)
 
 ```
-Subagent (general-purpose):
+Subagent ([AGENT]):
   description: "Review Task N (spec + quality)"
-  model: [MODEL — REQUIRED: choose per SKILL.md Model Selection; an omitted
-         model silently inherits the session's most expensive one]
+  model: [MODEL — REQUIRED on platforms without Codex custom-agent routing;
+         choose per SKILL.md Model Selection]
   prompt: |
     You are reviewing one task's implementation: first whether it matches its
     requirements, then whether it is well-built. This is a task-scoped gate,
@@ -166,6 +166,9 @@ Subagent (general-purpose):
 ```
 
 **Placeholders:**
+- `[AGENT]` — REQUIRED on Codex: `reviewer_standard` for a small or routine
+  task review, otherwise `reviewer_deep`. On other platforms, use
+  `general-purpose` and supply `[MODEL]` explicitly.
 - `[MODEL]` — REQUIRED: reviewer model per SKILL.md Model Selection
 - `[BRIEF_FILE]` — REQUIRED: the task brief file (`scripts/task-brief PLAN N`
   prints the path; same file the implementer worked from)

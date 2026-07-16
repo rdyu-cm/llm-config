@@ -7,5 +7,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .codebase-memory/
+.worktrees/
 output/
 .codex/config.generated.toml

@@ -7,6 +7,23 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CapabilityBundleTests(unittest.TestCase):
+    def test_codebase_memory_is_enabled_by_default_with_explicit_opt_out_profiles(self):
+        with (ROOT / ".codex/config.toml").open("rb") as handle:
+            base = tomllib.load(handle)
+
+        self.assertTrue(base["mcp_servers"]["codebase_memory"]["enabled"])
+
+        expected = {
+            "minimal": False,
+            "frontend": False,
+            "security": True,
+            "full": True,
+        }
+        for profile, enabled in expected.items():
+            with (ROOT / "profiles" / f"{profile}.config.toml").open("rb") as handle:
+                config = tomllib.load(handle)
+            self.assertEqual(config["mcp_servers"]["codebase_memory"]["enabled"], enabled)
+
     def test_catalog_paths_exist_and_component_keys_are_unique(self):
         with (ROOT / "capability-bundle.toml").open("rb") as handle:
             catalog = tomllib.load(handle)

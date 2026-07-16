@@ -1,5 +1,5 @@
 version = 1
-audited_at = "2026-07-13"
+audited_at = "2026-07-16"
 
 [[sources]]
 name = "openai-skills"
@@ -12,8 +12,8 @@ items = ["cli-creator", "gh-address-comments", "gh-fix-ci", "playwright"]
 name = "superpowers"
 repository = "https://github.com/obra/superpowers"
 commit = "d884ae04edebef577e82ff7c4e143debd0bbec99"
-license = "MIT"
-items = ["brainstorming", "writing-plans", "test-driven-development", "systematic-debugging", "verification-before-completion", "requesting-code-review", "receiving-code-review", "finishing-a-development-branch"]
+license = "MIT (licenses/superpowers-LICENSE)"
+items = ["brainstorming", "writing-plans", "test-driven-development", "systematic-debugging", "verification-before-completion", "requesting-code-review", "receiving-code-review", "finishing-a-development-branch", "executing-plans", "subagent-driven-development", "using-git-worktrees"]
 
 [[sources]]
 name = "vercel-agent-skills"
@@ -56,4 +56,3 @@ repository = "https://github.com/DeusData/codebase-memory-mcp"
 commit = "2469ecc3a7a2f80debe296e1f17a1efcfdb9450c"
 license = "MIT"
 items = ["npm:codebase-memory-mcp@0.8.1"]
-

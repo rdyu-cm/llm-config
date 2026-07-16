@@ -13,6 +13,7 @@
 - Source every skill from Superpowers commit `d884ae04edebef577e82ff7c4e143debd0bbec99`.
 - Vendor only `executing-plans`, `subagent-driven-development`, and `using-git-worktrees`.
 - Preserve every file in each selected upstream skill directory.
+- Preserve executable Git modes on the three subagent workflow helper scripts.
 - Keep `superpowers@openai-curated` disabled and do not commit Codex caches or machine state.
 - Preserve the existing `~/.agents/skills -> <clone>/skills` bootstrap architecture.
 
@@ -28,6 +29,7 @@
 - Modify: `sources.lock.toml`
 - Modify: `plugins.lock.toml`
 - Modify: `README.md`
+- Create: `licenses/superpowers-LICENSE`
 
 **Interfaces:**
 - Consumes: the existing Superpowers source pin and the bootstrap's canonical `skills/` directory.
@@ -45,8 +47,10 @@ class PortableSkillInventoryTests(unittest.TestCase):
             "subagent-driven-development": {
                 "SKILL.md",
                 "implementer-prompt.md",
-                "spec-reviewer-prompt.md",
-                "code-quality-reviewer-prompt.md",
+                "task-reviewer-prompt.md",
+                "scripts/review-package",
+                "scripts/sdd-workspace",
+                "scripts/task-brief",
             },
             "using-git-worktrees": {"SKILL.md"},
         }
@@ -57,6 +61,10 @@ class PortableSkillInventoryTests(unittest.TestCase):
                     (ROOT / "skills" / skill_name / relative_path).is_file(),
                     f"missing {skill_name}/{relative_path}",
                 )
+
+        for script_name in ("review-package", "sdd-workspace", "task-brief"):
+            script = ROOT / "skills" / "subagent-driven-development" / "scripts" / script_name
+            self.assertTrue(os.access(script, os.X_OK), f"not executable: {script_name}")
 ```
 
 - [ ] **Step 2: Run the inventory test and verify RED**
@@ -86,6 +94,16 @@ python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-githu
 
 Expected: all three directories are installed without overwriting existing skills.
 
+Restore executable modes on the pinned helper scripts because the installer
+copies their contents without preserving mode bits:
+
+```bash
+chmod +x \
+  skills/subagent-driven-development/scripts/review-package \
+  skills/subagent-driven-development/scripts/sdd-workspace \
+  skills/subagent-driven-development/scripts/task-brief
+```
+
 - [ ] **Step 4: Update the audited inventories**
 
 Append the three names to the Superpowers `items` array in `sources.lock.toml`:
@@ -107,6 +125,10 @@ items = [
 ```
 
 Update `plugins.lock.toml` to state that execution and worktree workflows are included in the selectively vendored distribution while `enabled = false` remains unchanged. Add the same three names and concise descriptions to README's “Superpowers workflow subset.”
+
+Copy the MIT notice from the pinned upstream `LICENSE` into
+`licenses/superpowers-LICENSE`, update the Superpowers license field to point
+to it, and set `audited_at = "2026-07-16"`.
 
 - [ ] **Step 5: Run the inventory test and verify GREEN**
 
@@ -141,7 +163,8 @@ Confirm the diff contains only the three upstream skill payloads, inventory test
 
 ```bash
 git add README.md plugins.lock.toml sources.lock.toml tests/test_bootstrap.py \
-  skills/executing-plans skills/subagent-driven-development skills/using-git-worktrees
+  licenses/superpowers-LICENSE skills/executing-plans \
+  skills/subagent-driven-development skills/using-git-worktrees
 git commit -m "feat: vendor portable execution skills"
 ```
 

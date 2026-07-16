@@ -2,9 +2,10 @@ version = 1
 
 # Superpowers is intentionally installed as audited standalone skills rather
 # than as a mandatory plugin, avoiding its session-wide bootstrap and hooks.
+# The selected subset includes plan execution, subagent review, and the
+# worktree workflow required by both execution skills.
 [plugins.superpowers]
 enabled = false
 distribution = "vendored-skills"
 repository = "https://github.com/obra/superpowers"
 commit = "d884ae04edebef577e82ff7c4e143debd0bbec99"
-

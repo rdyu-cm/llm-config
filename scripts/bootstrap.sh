@@ -91,6 +91,7 @@ install_config() {
       echo "local   preserved existing config at $LOCAL_CONFIG"
     fi
     if [ ! -L "$target" ]; then
+      mkdir -p "$(dirname -- "$target")"
       if ! ln -s "$GENERATED_CONFIG" "$target"; then
         if [ "$preserve_local" = true ]; then
           mv "$LOCAL_CONFIG" "$target"

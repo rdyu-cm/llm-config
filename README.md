@@ -57,6 +57,9 @@ Current Codex releases already provide system skills such as `skill-creator`, `s
 - `requesting-code-review`: prepares completed work for structured review.
 - `receiving-code-review`: evaluates review feedback technically before applying it.
 - `finishing-a-development-branch`: verifies completion and presents merge, PR, keep, or cleanup choices.
+- `executing-plans`: executes written implementation plans with review checkpoints.
+- `subagent-driven-development`: executes plan tasks with fresh implementer and reviewer subagents.
+- `using-git-worktrees`: creates or verifies isolated workspaces before plan execution.
 
 The full Superpowers plugin is not enabled. Its global bootstrap, mandatory workflow, delegation, and worktree behavior would be disproportionate for many small tasks.
 

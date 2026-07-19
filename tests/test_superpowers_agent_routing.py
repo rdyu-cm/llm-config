@@ -21,7 +21,7 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             "| Complete specification, isolated change, one or two files | "
             "`implementer_fast` | `gpt-5.6-terra`, medium |",
             "| Multi-file integration, pattern matching, or debugging | "
-            "`implementer_standard` | `gpt-5.6-sol`, medium |",
+            "`implementer_standard` | `gpt-5.6-terra`, medium |",
             "| Broad architectural context or substantial design judgment | "
             "`implementer_deep` | `gpt-5.6-sol`, high |",
             "| Small or routine task review | `reviewer_standard` | "

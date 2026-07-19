@@ -115,9 +115,10 @@ GITHUB_PAT_TOKEN=... codex --profile full
 - `planner`: read-only planning role pinned to `gpt-5.6-sol`.
 - `implementer`: bounded workspace-writing role pinned to `gpt-5.6-terra`.
 
-The four specialist agents inherit the current model. Planner and implementer are intentionally
-pinned for harness role routing; capability preflight must reject an unavailable pin rather than
-silently substitute another model.
+The browser debugger and docs researcher inherit the current model. Planner, every reviewer, and
+the deep implementation role are pinned to `gpt-5.6-sol`; the other implementation roles are
+pinned to `gpt-5.6-terra`. Capability preflight must reject an unavailable pin rather than silently
+substitute another model.
 
 Superpowers implementation and review dispatches use five model-tier agents. Fast implementation
 uses `implementer_fast`; integration work uses `implementer_standard`; broad design-sensitive work

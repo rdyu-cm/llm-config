@@ -39,6 +39,30 @@ class CapabilityBundleTests(unittest.TestCase):
         for item in catalog["components"]:
             self.assertTrue((ROOT / item["path"]).exists(), item)
 
+    def test_catalog_includes_every_discovered_skill(self):
+        with (ROOT / "capability-bundle.toml").open("rb") as handle:
+            catalog = tomllib.load(handle)
+
+        discovered = {path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")}
+        cataloged = {
+            item["path"].removeprefix("skills/")
+            for item in catalog["components"]
+            if item["kind"] == "skill"
+        }
+        self.assertEqual(cataloged, discovered)
+
+    def test_every_custom_agent_is_registered_in_base_config(self):
+        with (ROOT / ".codex/config.toml").open("rb") as handle:
+            base = tomllib.load(handle)
+
+        agent_files = sorted((ROOT / ".codex/agents").glob("*.toml"))
+        for path in agent_files:
+            with path.open("rb") as handle:
+                agent = tomllib.load(handle)
+            registration = base["agents"][agent["name"]]
+            self.assertEqual(registration["description"], agent["description"])
+            self.assertEqual(registration["config_file"], f"agents/{path.name}")
+
     def test_planner_and_implementer_pin_requested_models(self):
         with (ROOT / ".codex/agents/planner.toml").open("rb") as handle:
             planner = tomllib.load(handle)
@@ -53,7 +77,7 @@ class CapabilityBundleTests(unittest.TestCase):
     def test_superpowers_tier_agents_pin_models_reasoning_and_sandboxes(self):
         expected = {
             "implementer_fast": ("gpt-5.6-terra", "medium", "workspace-write"),
-            "implementer_standard": ("gpt-5.6-sol", "medium", "workspace-write"),
+            "implementer_standard": ("gpt-5.6-terra", "medium", "workspace-write"),
             "implementer_deep": ("gpt-5.6-sol", "high", "workspace-write"),
             "reviewer_standard": ("gpt-5.6-sol", "medium", "read-only"),
             "reviewer_deep": ("gpt-5.6-sol", "high", "read-only"),
@@ -74,6 +98,13 @@ class CapabilityBundleTests(unittest.TestCase):
             self.assertEqual(agent["sandbox_mode"], sandbox)
             self.assertIn("task prompt", agent["developer_instructions"])
             self.assertIn(name, catalog_agents)
+
+    def test_all_reviewer_roles_pin_sol(self):
+        for name in ("reviewer", "reviewer_standard", "reviewer_deep", "security_reviewer"):
+            filename = name.replace("_", "-") if name == "security_reviewer" else name
+            with (ROOT / ".codex" / "agents" / f"{filename}.toml").open("rb") as handle:
+                agent = tomllib.load(handle)
+            self.assertEqual(agent["model"], "gpt-5.6-sol")
 
 
 if __name__ == "__main__":

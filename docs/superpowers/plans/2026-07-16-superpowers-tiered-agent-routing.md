@@ -44,7 +44,7 @@ Append this method to `CapabilityBundleTests` in `tests/test_capability_bundle.p
     def test_superpowers_tier_agents_pin_models_reasoning_and_sandboxes(self):
         expected = {
             "implementer_fast": ("gpt-5.6-terra", "medium", "workspace-write"),
-            "implementer_standard": ("gpt-5.6-sol", "medium", "workspace-write"),
+            "implementer_standard": ("gpt-5.6-terra", "medium", "workspace-write"),
             "implementer_deep": ("gpt-5.6-sol", "high", "workspace-write"),
             "reviewer_standard": ("gpt-5.6-sol", "medium", "read-only"),
             "reviewer_deep": ("gpt-5.6-sol", "high", "read-only"),
@@ -334,7 +334,7 @@ inheritance:
 | Work | Codex agent | Model and reasoning |
 | --- | --- | --- |
 | Complete specification, isolated change, one or two files | `implementer_fast` | `gpt-5.6-terra`, medium |
-| Multi-file integration, pattern matching, or debugging | `implementer_standard` | `gpt-5.6-sol`, medium |
+| Multi-file integration, pattern matching, or debugging | `implementer_standard` | `gpt-5.6-terra`, medium |
 | Broad architectural context or substantial design judgment | `implementer_deep` | `gpt-5.6-sol`, high |
 | Small or routine task review | `reviewer_standard` | `gpt-5.6-sol`, medium |
 | Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer_deep` | `gpt-5.6-sol`, high |

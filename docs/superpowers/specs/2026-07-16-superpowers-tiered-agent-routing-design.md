@@ -13,7 +13,7 @@ Add five project custom agents under `.codex/agents/`:
 | Agent | Model | Reasoning | Intended work |
 | --- | --- | --- | --- |
 | `implementer_fast` | `gpt-5.6-terra` | `medium` | Mechanical, well-specified changes touching one or two files |
-| `implementer_standard` | `gpt-5.6-sol` | `medium` | Multi-file integration, debugging, and coordination |
+| `implementer_standard` | `gpt-5.6-terra` | `medium` | Multi-file integration, debugging, and coordination |
 | `implementer_deep` | `gpt-5.6-sol` | `high` | Implementation requiring broad context or design judgment |
 | `reviewer_standard` | `gpt-5.6-sol` | `medium` | Small or routine task reviews |
 | `reviewer_deep` | `gpt-5.6-sol` | `high` | Subtle, high-risk, or whole-branch reviews |
@@ -76,11 +76,11 @@ model mechanism.
 ## Performance
 
 The change does not increase the number of subagents, nesting depth, prompt
-size in a material way, or write concurrency. Mechanical work moves to Terra;
-integration and review stay on Sol; only difficult implementation and review
-use high reasoning. The principal performance risk is under-classifying a
-task and paying for a retry. The existing complexity signals and one-tier
-escalation rule bound that risk.
+size in a material way, or write concurrency. Mechanical and integration work
+use Terra; deep implementation and all review tiers use Sol. Only difficult
+implementation and review use high reasoning. The principal performance risk
+is under-classifying a task and paying for a retry. The existing complexity
+signals and one-tier escalation rule bound that risk.
 
 Loading five small TOML files and validating their pinned models adds
 negligible overhead. No new scheduler, agent loop, event stream, or persistence

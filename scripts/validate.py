@@ -84,6 +84,14 @@ def main() -> int:
         missing = sorted(required_agent_fields - data.keys())
         if missing:
             fail(f"{path.relative_to(ROOT)} missing fields: {', '.join(missing)}")
+        registration = config.get("agents", {}).get(data["name"])
+        if not isinstance(registration, dict):
+            fail(f"{data['name']} is not registered under [agents.{data['name']}]")
+        expected_path = f"agents/{path.name}"
+        if registration.get("config_file") != expected_path:
+            fail(f"{data['name']} config_file must be {expected_path}")
+        if registration.get("description") != data["description"]:
+            fail(f"{data['name']} registration description does not match its agent file")
 
     print(f"validated {len(skills)} skills, {len(agents)} agents, 3 hooks, and 4 profiles")
     return 0

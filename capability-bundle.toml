@@ -38,6 +38,12 @@ path = "skills/differential-review"
 classification = "supported"
 
 [[components]]
+name = "executing-plans"
+kind = "skill"
+path = "skills/executing-plans"
+classification = "supported"
+
+[[components]]
 name = "finishing-a-development-branch"
 kind = "skill"
 path = "skills/finishing-a-development-branch"
@@ -110,6 +116,12 @@ path = "skills/sharp-edges"
 classification = "supported"
 
 [[components]]
+name = "subagent-driven-development"
+kind = "skill"
+path = "skills/subagent-driven-development"
+classification = "supported"
+
+[[components]]
 name = "supply-chain-risk-auditor"
 kind = "skill"
 path = "skills/supply-chain-risk-auditor"
@@ -125,6 +137,12 @@ classification = "supported"
 name = "test-driven-development"
 kind = "skill"
 path = "skills/test-driven-development"
+classification = "supported"
+
+[[components]]
+name = "using-git-worktrees"
+kind = "skill"
+path = "skills/using-git-worktrees"
 classification = "supported"
 
 [[components]]

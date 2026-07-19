@@ -9,6 +9,50 @@ hooks = true
 max_threads = 4
 max_depth = 1
 
+[agents.browser_debugger]
+description = "Browser-flow investigator that reproduces UI failures and gathers console, network, screenshot, and trace evidence without editing application code."
+config_file = "agents/browser-debugger.toml"
+
+[agents.docs_researcher]
+description = "Read-only researcher that verifies current framework, API, and Codex behavior using authoritative documentation."
+config_file = "agents/docs-researcher.toml"
+
+[agents.implementer]
+description = "Implementation worker for an approved bounded slice with focused tests and concise evidence."
+config_file = "agents/implementer.toml"
+
+[agents.implementer_fast]
+description = "Fast Superpowers implementation worker for mechanical, fully specified changes limited to one or two files."
+config_file = "agents/implementer_fast.toml"
+
+[agents.implementer_standard]
+description = "Standard Superpowers implementation worker for multi-file integration, debugging, and coordination tasks."
+config_file = "agents/implementer_standard.toml"
+
+[agents.implementer_deep]
+description = "Deep Superpowers implementation worker for tasks requiring broad context or substantial design judgment."
+config_file = "agents/implementer_deep.toml"
+
+[agents.planner]
+description = "Read-only planner for requirements, architecture, sequencing, risks, and verification strategy before implementation."
+config_file = "agents/planner.toml"
+
+[agents.reviewer]
+description = "Read-only reviewer for correctness, security, regressions, and missing tests after implementation."
+config_file = "agents/reviewer.toml"
+
+[agents.reviewer_standard]
+description = "Read-only Superpowers reviewer for small or routine task-scoped changes."
+config_file = "agents/reviewer_standard.toml"
+
+[agents.reviewer_deep]
+description = "Read-only Superpowers reviewer for subtle, high-risk, or whole-branch changes."
+config_file = "agents/reviewer_deep.toml"
+
+[agents.security_reviewer]
+description = "Read-only security reviewer for diffs, insecure defaults, dependency risk, dangerous APIs, and agentic CI workflows."
+config_file = "agents/security-reviewer.toml"
+
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
 enabled = true

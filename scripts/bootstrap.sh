@@ -108,10 +108,22 @@ install_config() {
   fi
 }
 
+prewarm_codebase_memory() {
+  if [ "$APPLY" = false ]; then
+    return
+  fi
+  echo "prewarm Codebase Memory"
+  npx -y codebase-memory-mcp@0.8.1 </dev/null
+}
+
 echo "Portable Codex bootstrap ($([ "$APPLY" = true ] && echo apply || echo dry-run))"
 
 if ! install_config; then
   echo "Config installation failed; no discovery links were changed." >&2
+  exit 1
+fi
+if ! prewarm_codebase_memory; then
+  echo "Codebase Memory prewarm failed; no discovery links were changed." >&2
   exit 1
 fi
 

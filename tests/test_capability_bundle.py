@@ -12,6 +12,10 @@ class CapabilityBundleTests(unittest.TestCase):
             base = tomllib.load(handle)
 
         self.assertTrue(base["mcp_servers"]["codebase_memory"]["enabled"])
+        self.assertEqual(
+            base["mcp_servers"]["codebase_memory"]["startup_timeout_sec"],
+            60,
+        )
 
         expected = {
             "minimal": False,

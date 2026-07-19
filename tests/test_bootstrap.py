@@ -42,12 +42,23 @@ class BootstrapTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             fixture = Path(directory) / "fixture"
             home = Path(directory) / "home"
+            fake_bin = Path(directory) / "bin"
+            npx_log = Path(directory) / "npx.log"
             (fixture / "scripts").mkdir(parents=True)
             (fixture / ".codex" / "hooks").mkdir(parents=True)
             (fixture / ".codex" / "agents").mkdir()
             (fixture / "skills").mkdir()
             (fixture / "profiles").mkdir()
             home.mkdir()
+            fake_bin.mkdir()
+            fake_npx = fake_bin / "npx"
+            fake_npx.write_text(
+                "#!/usr/bin/env bash\n"
+                'printf "%s\\n" "$*" >> "$NPX_LOG"\n'
+                "if IFS= read -r _; then exit 97; fi\n",
+                encoding="utf-8",
+            )
+            fake_npx.chmod(0o755)
             shutil.copy(ROOT / "scripts" / "bootstrap.sh", fixture / "scripts" / "bootstrap.sh")
             shutil.copy(ROOT / "scripts" / "sync_config.py", fixture / "scripts" / "sync_config.py")
             (fixture / ".codex" / "config.toml").write_text(
@@ -59,7 +70,13 @@ class BootstrapTests(unittest.TestCase):
 
             result = subprocess.run(
                 ["bash", str(fixture / "scripts" / "bootstrap.sh"), "--apply"],
-                env={**os.environ, "HOME": str(home), "PYTHON": sys.executable},
+                env={
+                    **os.environ,
+                    "HOME": str(home),
+                    "PYTHON": sys.executable,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                    "NPX_LOG": str(npx_log),
+                },
                 capture_output=True,
                 text=True,
             )
@@ -70,6 +87,42 @@ class BootstrapTests(unittest.TestCase):
                 fixture / ".codex" / "config.generated.toml",
             )
             self.assertEqual((home / ".agents" / "skills").resolve(), fixture / "skills")
+            self.assertTrue(npx_log.exists(), "bootstrap did not invoke npx")
+            self.assertEqual(
+                npx_log.read_text(encoding="utf-8"),
+                "-y codebase-memory-mcp@0.8.1\n",
+            )
+
+    def test_dry_run_does_not_prewarm_codebase_memory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            fake_bin = Path(directory) / "bin"
+            home.mkdir()
+            fake_bin.mkdir()
+            npx_log = Path(directory) / "npx.log"
+            fake_npx = fake_bin / "npx"
+            fake_npx.write_text(
+                "#!/usr/bin/env bash\n"
+                'printf "%s\\n" "$*" >> "$NPX_LOG"\n',
+                encoding="utf-8",
+            )
+            fake_npx.chmod(0o755)
+
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts" / "bootstrap.sh"), "--dry-run"],
+                env={
+                    **os.environ,
+                    "HOME": str(home),
+                    "PYTHON": sys.executable,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                    "NPX_LOG": str(npx_log),
+                },
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(npx_log.exists())
 
     def test_failed_merge_leaves_existing_config_untouched(self):
         with tempfile.TemporaryDirectory() as directory:

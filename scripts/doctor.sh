@@ -42,7 +42,12 @@ fi
 check_command "Node.js" node true
 check_command "npx" npx true
 check_command "GitHub CLI" gh false
-check_command "Codebase Memory binary" codebase-memory-mcp false
+if npx -y codebase-memory-mcp@0.8.1 </dev/null; then
+  echo "ok      Codebase Memory MCP"
+else
+  echo "broken  Codebase Memory MCP" >&2
+  failures=$((failures + 1))
+fi
 
 if [ -n "$PYTHON" ] && "$PYTHON" "$ROOT/scripts/validate.py"; then
   echo "ok      repository configuration"

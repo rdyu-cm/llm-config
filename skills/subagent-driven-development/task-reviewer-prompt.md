@@ -8,11 +8,13 @@ code quality.
 more, nothing less) and is well-built (clean, tested, maintainable)
 
 ```
-Subagent ([AGENT]):
-  description: "Review Task N (spec + quality)"
+spawn_agent:
+  agent_type: [AGENT]
+  fork_turns="none"
+  task_name: "review-task-n"
   model: [MODEL — REQUIRED on platforms without Codex custom-agent routing;
          choose per SKILL.md Model Selection]
-  prompt: |
+  message: |
     You are reviewing one task's implementation: first whether it matches its
     requirements, then whether it is well-built. This is a task-scoped gate,
     not a merge review — a broad whole-branch review happens separately after
@@ -167,7 +169,8 @@ Subagent ([AGENT]):
 
 **Placeholders:**
 - `[AGENT]` — REQUIRED on Codex: `reviewer_standard` for a small or routine
-  task review, otherwise `reviewer_deep`. On other platforms, use
+  task review, otherwise `reviewer_deep`; pass the selected role as
+  `agent_type` with `fork_turns="none"`. On other platforms, use
   `general-purpose` and supply `[MODEL]` explicitly.
 - `[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a
   named Codex custom agent; choose per SKILL.md Model Selection.

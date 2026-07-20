@@ -129,6 +129,18 @@ that implementer. Single-file mechanical fixes also take the cheapest tier.
 - Touches multiple files with integration concerns → standard model
 - Requires design judgment or broad codebase understanding → most capable model
 
+For every named Codex dispatch, pass the selected role as `agent_type`, set
+`fork_turns="none"`, use a unique descriptive `task_name`, and put all child
+context in the self-contained `message`. `agent_type` is the custom-role selector;
+`task_name` is only a descriptive task label. Do not pass `model` or
+`reasoning_effort` alongside a named role because its TOML definition owns
+those settings.
+
+If the surfaced `spawn_agent` tool does not expose `agent_type` or
+`fork_turns="none"`, report that native custom-role selection is unavailable and stop before dispatch.
+Do not substitute `task_name` as the selector or claim that the configured
+model routing was applied.
+
 ### Codex Agent Tiers
 
 On Codex, select the named custom agent instead of relying on session-model

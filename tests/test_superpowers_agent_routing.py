@@ -12,7 +12,7 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
 
     def prompt_hash(self, relative: str) -> str:
         text = self.read(relative)
-        body = text.split("  prompt: |\n", 1)[1].split("\n```", 1)[0]
+        body = text.split("  message: |\n", 1)[1].split("\n```", 1)[0]
         return hashlib.sha256(body.encode()).hexdigest()
 
     def test_subagent_driven_development_maps_every_codex_tier(self):
@@ -85,12 +85,14 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
         final_reviewer = self.read("skills/requesting-code-review/code-reviewer.md")
 
         self.assertIn(
-            "Subagent ([AGENT]):\n"
-            '  description: "Implement Task N: [task name]"\n'
+            "spawn_agent:\n"
+            "  agent_type: [AGENT]\n"
+            '  fork_turns="none"\n'
+            '  task_name: "implement-task-n"\n'
             "  model: [MODEL — REQUIRED on platforms without Codex "
             "custom-agent routing;\n"
             "         choose per SKILL.md Model Selection]\n"
-            "  prompt: |\n",
+            "  message: |\n",
             implementer,
         )
         self.assertIn("implementer_fast", implementer)
@@ -99,12 +101,14 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             implementer,
         )
         self.assertIn(
-            "Subagent ([AGENT]):\n"
-            '  description: "Review Task N (spec + quality)"\n'
+            "spawn_agent:\n"
+            "  agent_type: [AGENT]\n"
+            '  fork_turns="none"\n'
+            '  task_name: "review-task-n"\n'
             "  model: [MODEL — REQUIRED on platforms without Codex "
             "custom-agent routing;\n"
             "         choose per SKILL.md Model Selection]\n"
-            "  prompt: |\n",
+            "  message: |\n",
             task_reviewer,
         )
         self.assertIn("reviewer_standard", task_reviewer)
@@ -114,11 +118,13 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             task_reviewer,
         )
         self.assertIn(
-            "Subagent ([AGENT]):\n"
-            '  description: "Review code changes"\n'
+            "spawn_agent:\n"
+            "  agent_type: [AGENT]\n"
+            '  fork_turns="none"\n'
+            '  task_name: "review-code-changes"\n'
             "  model: [MODEL — REQUIRED on platforms without Codex "
             "custom-agent routing]\n"
-            "  prompt: |\n",
+            "  message: |\n",
             final_reviewer,
         )
         self.assertIn("reviewer_deep", final_reviewer)
@@ -142,6 +148,29 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
         self.assertEqual(
             self.prompt_hash("skills/requesting-code-review/code-reviewer.md"),
             "f170e242028bb747b1235aef4136a2b25fab6a26d42d04678610fad445b0f5f8",
+        )
+
+    def test_active_codex_dispatches_use_agent_type_without_history_fork(self):
+        active_dispatch_files = (
+            "skills/subagent-driven-development/SKILL.md",
+            "skills/subagent-driven-development/implementer-prompt.md",
+            "skills/subagent-driven-development/task-reviewer-prompt.md",
+            "skills/requesting-code-review/SKILL.md",
+            "skills/requesting-code-review/code-reviewer.md",
+            "README.md",
+        )
+        for relative in active_dispatch_files:
+            text = self.read(relative)
+            self.assertIn("agent_type", text, relative)
+            self.assertIn('fork_turns="none"', text, relative)
+
+        workflow = self.read("skills/subagent-driven-development/SKILL.md")
+        self.assertIn("`agent_type` is the custom-role selector", workflow)
+        self.assertIn("`task_name` is only a descriptive task label", workflow)
+        self.assertIn(
+            "report that native custom-role selection is unavailable and stop before "
+            "dispatch",
+            workflow,
         )
 
     def test_standalone_review_defaults_standard_and_escalates_deep(self):

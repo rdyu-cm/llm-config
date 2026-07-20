@@ -3,11 +3,13 @@
 Use this template when dispatching an implementer subagent.
 
 ```
-Subagent ([AGENT]):
-  description: "Implement Task N: [task name]"
+spawn_agent:
+  agent_type: [AGENT]
+  fork_turns="none"
+  task_name: "implement-task-n"
   model: [MODEL — REQUIRED on platforms without Codex custom-agent routing;
          choose per SKILL.md Model Selection]
-  prompt: |
+  message: |
     You are implementing Task N: [task name]
 
     ## Task Description
@@ -140,5 +142,6 @@ Subagent ([AGENT]):
 
 **Dispatch placeholders:**
 - `[AGENT]` — REQUIRED on Codex: `implementer_fast`,
-  `implementer_standard`, or `implementer_deep` per SKILL.md Model Selection.
+  `implementer_standard`, or `implementer_deep` per SKILL.md Model Selection;
+  pass the selected role as `agent_type` with `fork_turns="none"`.
   On other platforms, use `general-purpose` and supply `[MODEL]` explicitly.

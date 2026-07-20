@@ -140,10 +140,23 @@ spawn_agent:
     information that wasn't provided. Never silently produce work you're unsure about.
 ```
 
+**Codex generic parent-model fallback:** If `agent_type` is unavailable, omit
+it and use the same self-contained message body shown above:
+
+```text
+spawn_agent:
+  fork_turns="none"
+  task_name: "[TASK_NAME]"
+  message: <same self-contained message body as the named form>
+```
+
+This child inherits the parent model and reasoning effort. Do not claim the
+`[AGENT]` role or its configured model was applied.
+
 **Non-Codex dispatch:** On other platforms, use `general-purpose` and supply `[MODEL]` explicitly.
 
 **Dispatch placeholders:**
-- `[AGENT]` — REQUIRED on Codex: `implementer_fast`,
+- `[AGENT]` — REQUIRED on Codex when `agent_type` is available: `implementer_fast`,
   `implementer_standard`, or `implementer_deep` per SKILL.md Model Selection;
   pass the selected role as `agent_type` with `fork_turns="none"`.
 - `[TASK_NAME]` — REQUIRED: a descriptive label unique within the parent session,

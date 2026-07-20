@@ -126,10 +126,10 @@ uses `implementer_deep`; routine review uses `reviewer_standard`; subtle or whol
 `reviewer_deep`. Their developer instructions stay intentionally thin so the complete Superpowers
 task prompt remains unchanged.
 
-Active Codex workflows pass the selected role through `agent_type` with
-`fork_turns="none"`; `task_name` remains a descriptive label. If those spawn
-arguments are unavailable, the workflow stops rather than silently inheriting
-the parent model.
+Active Codex workflows prefer the selected custom role through `agent_type`
+with `fork_turns="none"`. When `agent_type` is unavailable, they omit it and
+dispatch a generic child that inherits the parent model and reasoning effort;
+`task_name` remains only a unique descriptive label.
 
 ## Harness capability catalog
 

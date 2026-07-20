@@ -34,9 +34,13 @@ HEAD_SHA=$(git rev-parse HEAD)
 On Codex, dispatch `reviewer_standard` by default and use `reviewer_deep` for
 broad, subtle, security-sensitive, concurrency-sensitive, or whole-branch
 changes. Pass the selected reviewer as `agent_type` with `fork_turns="none"`
-and put all child context in the self-contained `message`. If either spawn
-field is unavailable, native custom-role dispatch is blocked; report that and
-stop before dispatch. On another platform, dispatch a `general-purpose` subagent with an
+and put all child context in the self-contained `message`. If `agent_type` is
+unavailable, omit it and dispatch a generic child with `fork_turns="none"`, the
+same unique descriptive `task_name`, and the same self-contained `message`.
+That child inherits the parent model and reasoning effort. Report the fallback
+accurately and do not claim the selected reviewer role or its configured model
+was applied. Stop only if a required generic spawn field is unavailable or the
+generic spawn returns an error. On another platform, dispatch a `general-purpose` subagent with an
 explicit model appropriate to the same risk. Fill the template at
 [code-reviewer.md](code-reviewer.md).
 

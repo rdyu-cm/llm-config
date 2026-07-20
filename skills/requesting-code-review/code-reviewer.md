@@ -129,11 +129,25 @@ spawn_agent:
     - Avoid giving a clear verdict
 ```
 
+**Codex generic parent-model fallback:** If `agent_type` is unavailable, omit
+it and use the same self-contained message body shown above:
+
+```text
+spawn_agent:
+  fork_turns="none"
+  task_name: "[TASK_NAME]"
+  message: <same self-contained message body as the named form>
+```
+
+This child inherits the parent model and reasoning effort. Do not claim the
+`[AGENT]` role or its configured model was applied.
+
 **Non-Codex dispatch:** On other platforms, use `general-purpose` and supply
 `[MODEL]` explicitly.
 
 **Placeholders:**
-- `[AGENT]` — REQUIRED on Codex: `reviewer_standard` by default or
+- `[AGENT]` — REQUIRED on Codex when `agent_type` is available:
+  `reviewer_standard` by default or
   `reviewer_deep` for broad, subtle, high-risk, or whole-branch review. The
   final review in subagent-driven development always uses `reviewer_deep`;
   pass the selected role as `agent_type` with `fork_turns="none"`.

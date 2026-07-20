@@ -136,10 +136,14 @@ context in the self-contained `message`. `agent_type` is the custom-role selecto
 `reasoning_effort` alongside a named role because its TOML definition owns
 those settings.
 
-If the surfaced `spawn_agent` tool does not expose `agent_type` or
-`fork_turns="none"`, report that native custom-role selection is unavailable and stop before dispatch.
-Do not substitute `task_name` as the selector or claim that the configured
-model routing was applied.
+If the surfaced `spawn_agent` tool does not expose `agent_type`, omit `agent_type` and dispatch a generic child with `fork_turns="none"`, the same
+unique descriptive `task_name`, and the same self-contained `message`. That
+child inherits the parent model and reasoning effort. Missing `agent_type` alone is not a dispatch failure. Record the fallback accurately and do not
+claim that a configured Terra/Sol role pin was applied.
+
+Stop only if `message`, `task_name`, or `fork_turns="none"` is unavailable, or
+if the generic spawn itself returns an error. Never substitute `task_name` as
+a role selector.
 
 ### Codex Agent Tiers
 
@@ -158,8 +162,8 @@ The final whole-branch review always uses `reviewer_deep`. If an implementer
 reports that the task needs more reasoning, redispatch once at the next
 stronger implementer tier with the missing context; never repeat the same
 underpowered dispatch unchanged. If a required Codex agent is unavailable,
-report it and stop before dispatch rather than silently inheriting the session
-model. On non-Codex platforms, keep using a general-purpose subagent with the
+direct the workflow to the generic parent-model fallback and report that no
+configured role pin was applied. On non-Codex platforms, keep using a general-purpose subagent with the
 explicit model selected by the policy above.
 
 ## Handling Implementer Status

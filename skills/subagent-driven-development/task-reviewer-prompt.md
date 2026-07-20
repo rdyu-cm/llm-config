@@ -167,11 +167,25 @@ spawn_agent:
     **Reasoning:** [1-2 sentence technical assessment]
 ```
 
+**Codex generic parent-model fallback:** If `agent_type` is unavailable, omit
+it and use the same self-contained message body shown above:
+
+```text
+spawn_agent:
+  fork_turns="none"
+  task_name: "[TASK_NAME]"
+  message: <same self-contained message body as the named form>
+```
+
+This child inherits the parent model and reasoning effort. Do not claim the
+`[AGENT]` role or its configured model was applied.
+
 **Non-Codex dispatch:** On other platforms, use `general-purpose` and supply
 `[MODEL]` explicitly.
 
 **Placeholders:**
-- `[AGENT]` — REQUIRED on Codex: `reviewer_standard` for a small or routine
+- `[AGENT]` — REQUIRED on Codex when `agent_type` is available:
+  `reviewer_standard` for a small or routine
   task review, otherwise `reviewer_deep`; pass the selected role as
   `agent_type` with `fork_turns="none"`.
 - `[TASK_NAME]` — REQUIRED: a descriptive label unique within the parent session,

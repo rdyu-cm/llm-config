@@ -43,8 +43,7 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             skill,
         )
         self.assertIn(
-            "report it and stop before dispatch rather than silently inheriting the "
-            "session\nmodel",
+            "direct the workflow to the generic parent-model fallback",
             skill,
         )
         self.assertIn(
@@ -140,6 +139,20 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             "skills/subagent-driven-development/task-reviewer-prompt.md",
             "skills/requesting-code-review/code-reviewer.md",
         ):
+            text = self.read(relative)
+            self.assertIn(
+                "**Codex generic parent-model fallback:**",
+                text,
+                relative,
+            )
+            self.assertIn(
+                "spawn_agent:\n"
+                '  fork_turns="none"\n'
+                '  task_name: "[TASK_NAME]"\n'
+                "  message: <same self-contained message body as the named form>",
+                text,
+                relative,
+            )
             metadata = self.dispatch_metadata(relative)
             self.assertNotIn("model:", metadata, relative)
             self.assertNotIn("reasoning_effort", metadata, relative)
@@ -160,7 +173,7 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             "f170e242028bb747b1235aef4136a2b25fab6a26d42d04678610fad445b0f5f8",
         )
 
-    def test_active_codex_dispatches_use_agent_type_without_history_fork(self):
+    def test_active_codex_dispatches_fallback_to_parent_model(self):
         active_dispatch_files = (
             "skills/subagent-driven-development/SKILL.md",
             "skills/subagent-driven-development/implementer-prompt.md",
@@ -173,13 +186,18 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             text = self.read(relative)
             self.assertIn("agent_type", text, relative)
             self.assertIn('fork_turns="none"', text, relative)
+            self.assertIn("parent model", text, relative)
 
         workflow = self.read("skills/subagent-driven-development/SKILL.md")
-        self.assertIn("`agent_type` is the custom-role selector", workflow)
-        self.assertIn("`task_name` is only a descriptive task label", workflow)
-        self.assertIn(
-            "report that native custom-role selection is unavailable and stop before "
-            "dispatch",
+        self.assertIn("omit `agent_type` and dispatch a generic child", workflow)
+        self.assertIn("inherits the parent model and reasoning effort", workflow)
+        self.assertIn("Missing `agent_type` alone is not a dispatch failure", workflow)
+        self.assertNotIn(
+            "native custom-role selection is unavailable and stop before dispatch",
+            workflow,
+        )
+        self.assertNotIn(
+            "report it and stop before dispatch rather than silently inheriting",
             workflow,
         )
 

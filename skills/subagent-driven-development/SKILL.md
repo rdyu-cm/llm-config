@@ -105,8 +105,9 @@ Use the least powerful model that can handle each role to conserve cost and incr
 **Integration and judgment tasks** (multi-file coordination, pattern matching, debugging): use a standard model.
 
 **Architecture and design tasks**: use the most capable available model.
-The final whole-branch review is one of these — dispatch it on the most
-capable available model, not the session default.
+For the final whole-branch review, when `agent_type` is available, dispatch
+`reviewer_deep`; otherwise use the generic parent-model fallback and report
+that no configured role or model pin was applied.
 
 **Review tasks**: choose the model with the same judgment, scaled to the
 diff's size, complexity, and risk. A small mechanical diff does not need the
@@ -158,7 +159,9 @@ inheritance:
 | Small or routine task review | `reviewer_standard` | `gpt-5.6-sol`, medium |
 | Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer_deep` | `gpt-5.6-sol`, high |
 
-The final whole-branch review always uses `reviewer_deep`. If an implementer
+When `agent_type` is available, the final whole-branch review uses
+`reviewer_deep`; otherwise it uses the generic parent-model fallback and
+reports that no configured role or model pin was applied. If an implementer
 reports that the task needs more reasoning, redispatch once at the next
 stronger implementer tier with the missing context; never repeat the same
 underpowered dispatch unchanged. If a required Codex agent is unavailable,

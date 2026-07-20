@@ -35,8 +35,21 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
         ):
             self.assertIn(row, skill)
         self.assertIn(
+            "For the final whole-branch review, when `agent_type` is available, "
+            "dispatch\n`reviewer_deep`; otherwise use the generic parent-model "
+            "fallback and report\nthat no configured role or model pin was applied.",
+            skill,
+        )
+        self.assertIn(
+            "When `agent_type` is available, the final whole-branch review uses\n"
+            "`reviewer_deep`; otherwise it uses the generic parent-model fallback "
+            "and\nreports that no configured role or model pin was applied.",
+            skill,
+        )
+        self.assertNotIn(
             "The final whole-branch review always uses `reviewer_deep`.", skill
         )
+        self.assertNotIn("not the session default", skill)
         self.assertIn(
             "redispatch once at the next\nstronger implementer tier with the missing "
             "context",

@@ -7,6 +7,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CapabilityBundleTests(unittest.TestCase):
+    def test_multi_agent_v2_owns_concurrency_limit(self):
+        with (ROOT / ".codex/config.toml").open("rb") as handle:
+            base = tomllib.load(handle)
+
+        self.assertEqual(
+            base["features"]["multi_agent_v2"],
+            {
+                "enabled": True,
+                "max_concurrent_threads_per_session": 5,
+            },
+        )
+        self.assertNotIn("max_threads", base["agents"])
+        self.assertEqual(base["agents"]["max_depth"], 1)
+
     def test_codebase_memory_is_enabled_by_default_with_explicit_opt_out_profiles(self):
         with (ROOT / ".codex/config.toml").open("rb") as handle:
             base = tomllib.load(handle)

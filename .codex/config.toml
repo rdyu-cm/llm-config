@@ -5,8 +5,11 @@ sandbox_mode = "workspace-write"
 [features]
 hooks = true
 
+[features.multi_agent_v2]
+enabled = true
+max_concurrent_threads_per_session = 5
+
 [agents]
-max_threads = 4
 max_depth = 1
 
 [agents.browser_debugger]

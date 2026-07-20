@@ -15,6 +15,10 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
         body = text.split("  message: |\n", 1)[1].split("\n```", 1)[0]
         return hashlib.sha256(body.encode()).hexdigest()
 
+    def dispatch_metadata(self, relative: str) -> str:
+        text = self.read(relative)
+        return text.split("spawn_agent:\n", 1)[1].split("  message: |\n", 1)[0]
+
     def test_subagent_driven_development_maps_every_codex_tier(self):
         skill = self.read("skills/subagent-driven-development/SKILL.md")
         for row in (
@@ -88,14 +92,13 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             "spawn_agent:\n"
             "  agent_type: [AGENT]\n"
             '  fork_turns="none"\n'
-            '  task_name: "implement-task-n"\n'
-            "  model: [MODEL — REQUIRED on platforms without Codex "
-            "custom-agent routing;\n"
-            "         choose per SKILL.md Model Selection]\n"
+            '  task_name: "[TASK_NAME]"\n'
             "  message: |\n",
             implementer,
         )
         self.assertIn("implementer_fast", implementer)
+        self.assertIn("unique within the parent session", implementer)
+        self.assertIn("`implement-task-3`", implementer)
         self.assertIn(
             "On other platforms, use `general-purpose` and supply `[MODEL]` explicitly.",
             implementer,
@@ -104,14 +107,13 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             "spawn_agent:\n"
             "  agent_type: [AGENT]\n"
             '  fork_turns="none"\n'
-            '  task_name: "review-task-n"\n'
-            "  model: [MODEL — REQUIRED on platforms without Codex "
-            "custom-agent routing;\n"
-            "         choose per SKILL.md Model Selection]\n"
+            '  task_name: "[TASK_NAME]"\n'
             "  message: |\n",
             task_reviewer,
         )
         self.assertIn("reviewer_standard", task_reviewer)
+        self.assertIn("unique within the parent session", task_reviewer)
+        self.assertIn("`review-task-3`", task_reviewer)
         self.assertIn(
             "[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a\n"
             "  named Codex custom agent; choose per SKILL.md Model Selection.",
@@ -121,18 +123,26 @@ class SuperpowersAgentRoutingTests(unittest.TestCase):
             "spawn_agent:\n"
             "  agent_type: [AGENT]\n"
             '  fork_turns="none"\n'
-            '  task_name: "review-code-changes"\n'
-            "  model: [MODEL — REQUIRED on platforms without Codex "
-            "custom-agent routing]\n"
+            '  task_name: "[TASK_NAME]"\n'
             "  message: |\n",
             final_reviewer,
         )
         self.assertIn("reviewer_deep", final_reviewer)
+        self.assertIn("unique within the parent session", final_reviewer)
+        self.assertIn("`review-code-changes-300421c`", final_reviewer)
         self.assertIn(
             "[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a\n"
             "  named Codex custom agent.",
             final_reviewer,
         )
+        for relative in (
+            "skills/subagent-driven-development/implementer-prompt.md",
+            "skills/subagent-driven-development/task-reviewer-prompt.md",
+            "skills/requesting-code-review/code-reviewer.md",
+        ):
+            metadata = self.dispatch_metadata(relative)
+            self.assertNotIn("model:", metadata, relative)
+            self.assertNotIn("reasoning_effort", metadata, relative)
         self.assertEqual(
             self.prompt_hash(
                 "skills/subagent-driven-development/implementer-prompt.md"

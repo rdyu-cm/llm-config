@@ -7,13 +7,13 @@ code quality.
 **Purpose:** Verify one task's implementation matches its requirements (nothing
 more, nothing less) and is well-built (clean, tested, maintainable)
 
+**Codex named custom-agent form:**
+
 ```
 spawn_agent:
   agent_type: [AGENT]
   fork_turns="none"
-  task_name: "review-task-n"
-  model: [MODEL — REQUIRED on platforms without Codex custom-agent routing;
-         choose per SKILL.md Model Selection]
+  task_name: "[TASK_NAME]"
   message: |
     You are reviewing one task's implementation: first whether it matches its
     requirements, then whether it is well-built. This is a task-scoped gate,
@@ -167,11 +167,15 @@ spawn_agent:
     **Reasoning:** [1-2 sentence technical assessment]
 ```
 
+**Non-Codex dispatch:** On other platforms, use `general-purpose` and supply
+`[MODEL]` explicitly.
+
 **Placeholders:**
 - `[AGENT]` — REQUIRED on Codex: `reviewer_standard` for a small or routine
   task review, otherwise `reviewer_deep`; pass the selected role as
-  `agent_type` with `fork_turns="none"`. On other platforms, use
-  `general-purpose` and supply `[MODEL]` explicitly.
+  `agent_type` with `fork_turns="none"`.
+- `[TASK_NAME]` — REQUIRED: a descriptive label unique within the parent session,
+  for example `review-task-3`.
 - `[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a
   named Codex custom agent; choose per SKILL.md Model Selection.
 - `[BRIEF_FILE]` — REQUIRED: the task brief file (`scripts/task-brief PLAN N`

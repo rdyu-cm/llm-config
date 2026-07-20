@@ -2,13 +2,13 @@
 
 Use this template when dispatching an implementer subagent.
 
+**Codex named custom-agent form:**
+
 ```
 spawn_agent:
   agent_type: [AGENT]
   fork_turns="none"
-  task_name: "implement-task-n"
-  model: [MODEL — REQUIRED on platforms without Codex custom-agent routing;
-         choose per SKILL.md Model Selection]
+  task_name: "[TASK_NAME]"
   message: |
     You are implementing Task N: [task name]
 
@@ -140,8 +140,13 @@ spawn_agent:
     information that wasn't provided. Never silently produce work you're unsure about.
 ```
 
+**Non-Codex dispatch:** On other platforms, use `general-purpose` and supply `[MODEL]` explicitly.
+
 **Dispatch placeholders:**
 - `[AGENT]` — REQUIRED on Codex: `implementer_fast`,
   `implementer_standard`, or `implementer_deep` per SKILL.md Model Selection;
   pass the selected role as `agent_type` with `fork_turns="none"`.
-  On other platforms, use `general-purpose` and supply `[MODEL]` explicitly.
+- `[TASK_NAME]` — REQUIRED: a descriptive label unique within the parent session,
+  for example `implement-task-3`.
+- `[MODEL]` — REQUIRED only for the non-Codex `general-purpose` dispatch;
+  choose per SKILL.md Model Selection.

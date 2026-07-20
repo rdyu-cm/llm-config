@@ -4,12 +4,13 @@ Use this template when dispatching a code reviewer subagent.
 
 **Purpose:** Review completed work against requirements and code quality standards before it cascades into more work.
 
+**Codex named custom-agent form:**
+
 ```
 spawn_agent:
   agent_type: [AGENT]
   fork_turns="none"
-  task_name: "review-code-changes"
-  model: [MODEL — REQUIRED on platforms without Codex custom-agent routing]
+  task_name: "[TASK_NAME]"
   message: |
     You are a Senior Code Reviewer with expertise in software architecture,
     design patterns, and best practices. Your job is to review completed work
@@ -128,12 +129,16 @@ spawn_agent:
     - Avoid giving a clear verdict
 ```
 
+**Non-Codex dispatch:** On other platforms, use `general-purpose` and supply
+`[MODEL]` explicitly.
+
 **Placeholders:**
 - `[AGENT]` — REQUIRED on Codex: `reviewer_standard` by default or
   `reviewer_deep` for broad, subtle, high-risk, or whole-branch review. The
   final review in subagent-driven development always uses `reviewer_deep`;
-  pass the selected role as `agent_type` with `fork_turns="none"`. On other
-  platforms, use `general-purpose` and supply `[MODEL]` explicitly.
+  pass the selected role as `agent_type` with `fork_turns="none"`.
+- `[TASK_NAME]` — REQUIRED: a descriptive label unique within the parent session,
+  for example `review-code-changes-300421c`.
 - `[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a
   named Codex custom agent.
 - `[DESCRIPTION]` — brief summary of what was built

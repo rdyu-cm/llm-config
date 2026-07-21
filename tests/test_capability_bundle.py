@@ -12,10 +12,12 @@ class CapabilityBundleTests(unittest.TestCase):
             base = tomllib.load(handle)
 
         self.assertEqual(
-            base["features"]["multi_agent_v2"],
+            base["features"].get("multi_agent_v2"),
             {
                 "enabled": True,
+                "hide_spawn_agent_metadata": False,
                 "max_concurrent_threads_per_session": 5,
+                "tool_namespace": "agents",
             },
         )
         self.assertNotIn("max_threads", base["agents"])

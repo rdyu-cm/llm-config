@@ -13,8 +13,15 @@ Replace the legacy `agents.max_threads = 4` setting with a structured
 ```toml
 [features.multi_agent_v2]
 enabled = true
+hide_spawn_agent_metadata = false
 max_concurrent_threads_per_session = 5
+tool_namespace = "agents"
 ```
+
+Use the non-reserved `agents` namespace so Codex does not submit its generated
+V2 schema as the model-reserved `collaboration.spawn_agent` function. Keep
+spawn metadata visible so `agent_type`, model, and reasoning settings remain
+available for configured custom roles.
 
 Multi-Agent V2 counts the root agent in its session-wide thread limit, so five
 total threads preserve capacity for four children. Keep `agents.max_depth = 1`

@@ -13,6 +13,8 @@
 - Keep `agents.max_depth = 1` and every named agent registration unchanged.
 - Preserve all Terra/Sol model pins, reasoning effort, and sandbox defaults.
 - Configure five V2 session threads: one root plus four children.
+- Expose spawn metadata so configured custom roles remain selectable.
+- Register V2 tools under `agents`, not the model-reserved `collaboration` namespace.
 - Do not add a legacy V1 profile.
 
 ---
@@ -26,7 +28,7 @@
 
 **Interfaces:**
 - Consumes: Codex `features.multi_agent_v2` structured configuration and the existing bootstrap merge flow.
-- Produces: A portable configuration where `multi_agent_v2.enabled` is `true`, `max_concurrent_threads_per_session` is `5`, and `agents.max_threads` is absent.
+- Produces: A portable configuration where `multi_agent_v2.enabled` is `true`, `hide_spawn_agent_metadata` is `false`, `max_concurrent_threads_per_session` is `5`, `tool_namespace` is `"agents"`, and `agents.max_threads` is absent.
 
 - [ ] **Step 1: Write the failing configuration regression test**
 
@@ -41,7 +43,9 @@ def test_multi_agent_v2_owns_concurrency_limit(self):
         base["features"]["multi_agent_v2"],
         {
             "enabled": True,
+            "hide_spawn_agent_metadata": False,
             "max_concurrent_threads_per_session": 5,
+            "tool_namespace": "agents",
         },
     )
     self.assertNotIn("max_threads", base["agents"])
@@ -68,7 +72,9 @@ hooks = true
 
 [features.multi_agent_v2]
 enabled = true
+hide_spawn_agent_metadata = false
 max_concurrent_threads_per_session = 5
+tool_namespace = "agents"
 
 [agents]
 max_depth = 1
@@ -96,15 +102,15 @@ Run:
 
 Expected: bootstrap regenerates `.codex/config.generated.toml`, keeps `~/.codex/config.toml` linked to it, and finishes successfully.
 
-- [ ] **Step 6: Verify CLI bootstrap without a model request**
+- [ ] **Step 6: Verify a real model request uses the non-reserved tool namespace**
 
-Run in a PTY:
+Run:
 
 ```bash
-timeout 5 codex --no-alt-screen
+timeout 30 codex exec --ephemeral -C /tmp 'Reply exactly OK.'
 ```
 
-Expected: Codex renders the TUI and waits for input until `timeout` exits with status `124`; output must not contain `agents.max_threads cannot be set` or a `thread/start failed` error.
+Expected: exits `0`, prints `OK`, and does not contain the reserved `collaboration.spawn_agent` schema error, `agents.max_threads cannot be set`, or a `thread/start failed` error.
 
 - [ ] **Step 7: Run repository verification**
 

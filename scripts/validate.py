@@ -70,6 +70,43 @@ def validate_gstack_vendor(root: Path, lock: dict) -> None:
         fail("gstack commit metadata does not match sources.lock.toml")
 
 
+def validate_gstack_catalog(root: Path) -> int:
+    catalog = load_toml(root / "gstack-capabilities.toml")
+    profiles = catalog.get("profiles")
+    if not isinstance(profiles, dict):
+        fail("gstack-capabilities.toml is missing profiles")
+
+    lists: dict[str, list[str]] = {}
+    for profile in ("workflow", "full"):
+        skills = profiles.get(profile, {}).get("skills")
+        if not isinstance(skills, list) or not all(isinstance(name, str) for name in skills):
+            fail(f"gstack {profile} profile must contain a skills list")
+        if len(skills) != len(set(skills)):
+            fail(f"gstack {profile} profile contains duplicate skill names")
+        lists[profile] = skills
+
+    full = set(lists["full"])
+    generated = {
+        path.parent.name
+        for path in (root / "generated" / "gstack-codex").glob("gstack-*/SKILL.md")
+    }
+    unlisted = sorted(generated - full - {"gstack-upgrade"})
+    if unlisted:
+        fail(f"generated gstack skills missing from full profile: {', '.join(unlisted)}")
+
+    missing = sorted(set(lists["workflow"]) - full)
+    if missing:
+        fail(f"gstack workflow skills missing from full profile: {', '.join(missing)}")
+    for name in lists["full"]:
+        path = root / "generated" / "gstack-codex" / name / "SKILL.md"
+        if not path.is_file():
+            fail(f"missing generated gstack skill: {name}")
+        metadata = parse_frontmatter(path)
+        if metadata["name"] != name:
+            fail(f"generated gstack skill name does not match catalog: {name}")
+    return len(lists["full"])
+
+
 def main() -> int:
     config = load_toml(ROOT / ".codex" / "config.toml")
     if config.get("sandbox_mode") != "workspace-write":
@@ -79,6 +116,7 @@ def main() -> int:
         load_toml(path)
     sources = load_toml(ROOT / "sources.lock.toml")
     validate_gstack_vendor(ROOT, sources)
+    gstack_skills = validate_gstack_catalog(ROOT)
     load_toml(ROOT / "plugins.lock.toml")
 
     with (ROOT / ".codex" / "hooks.json").open(encoding="utf-8") as handle:
@@ -115,7 +153,10 @@ def main() -> int:
         if registration.get("description") != data["description"]:
             fail(f"{data['name']} registration description does not match its agent file")
 
-    print(f"validated {len(skills)} skills, {len(agents)} agents, 3 hooks, and 4 profiles")
+    print(
+        f"validated {len(skills)} personal skills, {gstack_skills} generated gstack skills, "
+        f"{len(agents)} agents, 3 hooks, and 4 profiles"
+    )
     return 0
 
 

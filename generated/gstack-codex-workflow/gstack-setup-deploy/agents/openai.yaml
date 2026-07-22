@@ -1,0 +1,6 @@
+interface:
+  display_name: "gstack-setup-deploy"
+  short_description: "Use the $gstack-setup-deploy workflow."
+  default_prompt: "Invoke $gstack-setup-deploy for this task."
+policy:
+  allow_implicit_invocation: true

@@ -114,9 +114,11 @@ except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError, tomllib.
 
 expected = {}
 if mode != "off":
-    skills = catalog["profiles"][mode]["skills"]
+    profile = catalog["profiles"][mode]
+    skills = profile["skills"]
+    generated_root = root / profile["generated_root"]
     expected = {
-        home / ".codex" / "skills" / name: root / "generated" / "gstack-codex" / name
+        home / ".codex" / "skills" / name: generated_root / name
         for name in skills
     }
     runtime = home / ".codex" / "skills" / "gstack"

@@ -22,7 +22,8 @@ RUNTIME_SKILLS = {
         "gstack-benchmark", "gstack-browse", "gstack-canary", "gstack-design-consultation",
         "gstack-design-html", "gstack-design-review", "gstack-design-shotgun",
         "gstack-devex-review", "gstack-land-and-deploy",
-        "gstack-open-gstack-browser", "gstack-pair-agent", "gstack-plan-design-review",
+        "gstack-office-hours", "gstack-open-gstack-browser", "gstack-pair-agent",
+        "gstack-plan-design-review",
         "gstack-qa", "gstack-qa-only", "gstack-setup-browser-cookies",
     },
     "GSTACK_DESIGN": {
@@ -103,7 +104,7 @@ class GstackCatalogTests(unittest.TestCase):
 
         violations = {}
         for name in workflow:
-            text = (ROOT / "generated/gstack-codex" / name / "SKILL.md").read_text(
+            text = (ROOT / "generated/gstack-codex-workflow" / name / "SKILL.md").read_text(
                 encoding="utf-8"
             )
             found = workflow_browser_policy_violations(text)
@@ -123,7 +124,7 @@ class GstackCatalogTests(unittest.TestCase):
             temporary_root = Path(directory)
             shutil.copy(ROOT / "gstack-capabilities.toml", temporary_root / "gstack-capabilities.toml")
             shutil.copytree(ROOT / "generated", temporary_root / "generated")
-            skill = temporary_root / "generated/gstack-codex/gstack-review/SKILL.md"
+            skill = temporary_root / "generated/gstack-codex-workflow/gstack-review/SKILL.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8") + "\n```bash\nxdg-open artifact.html\n```\n",
                 encoding="utf-8",
@@ -139,15 +140,33 @@ class GstackCatalogTests(unittest.TestCase):
         self.assertFalse(workflow & BROWSER_SKILLS)
         self.assertNotIn("gstack-upgrade", workflow)
     def test_every_generated_sidecar_meets_codex_metadata_contract(self) -> None:
-        sidecars = sorted((ROOT / "generated" / "gstack-codex").glob("gstack-*/agents/openai.yaml"))
-        self.assertEqual(len(sidecars), 53)
-        for path in sidecars:
-            name = path.parents[1].name
-            metadata = parse_gstack_openai_metadata(path)
-            self.assertEqual(metadata["interface"]["display_name"], name)
-            self.assertGreaterEqual(len(metadata["interface"]["short_description"]), 25)
-            self.assertLessEqual(len(metadata["interface"]["short_description"]), 64)
-            self.assertIn(f"${name}", metadata["interface"]["default_prompt"])
+        roots = {"gstack-codex": 53, "gstack-codex-workflow": 28}
+        for generated_root, expected_count in roots.items():
+            sidecars = sorted(
+                (ROOT / "generated" / generated_root).glob("gstack-*/agents/openai.yaml")
+            )
+            self.assertEqual(len(sidecars), expected_count, generated_root)
+            for path in sidecars:
+                name = path.parents[1].name
+                metadata = parse_gstack_openai_metadata(path)
+                self.assertEqual(metadata["interface"]["display_name"], name)
+                self.assertGreaterEqual(len(metadata["interface"]["short_description"]), 25)
+                self.assertLessEqual(len(metadata["interface"]["short_description"]), 64)
+                self.assertIn(f"${name}", metadata["interface"]["default_prompt"])
+
+    def test_shared_skills_split_browser_behavior_by_profile(self) -> None:
+        full = ROOT / "generated/gstack-codex"
+        workflow = ROOT / "generated/gstack-codex-workflow"
+        cases = {
+            "gstack-office-hours": ("file://", "Skip browser preview and setup"),
+            "gstack-plan-design-review": ("$D compare", "continue the non-browser review flow"),
+        }
+        for name, (full_branch, workflow_fallback) in cases.items():
+            full_text = (full / name / "SKILL.md").read_text(encoding="utf-8")
+            workflow_text = (workflow / name / "SKILL.md").read_text(encoding="utf-8")
+            self.assertIn(full_branch, full_text, name)
+            self.assertIn(workflow_fallback, workflow_text, name)
+            self.assertEqual(workflow_browser_policy_violations(workflow_text), [], name)
 
     def test_catalog_rejects_gstack_upgrade_in_full_profile(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -167,11 +186,8 @@ class GstackCatalogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             temporary_root = Path(directory)
             shutil.copy(ROOT / "gstack-capabilities.toml", temporary_root / "gstack-capabilities.toml")
-            skills = temporary_root / "generated" / "gstack-codex"
-            skills.mkdir(parents=True)
-            for source in (ROOT / "generated" / "gstack-codex").glob("gstack-*"):
-                if source.name != "gstack-upgrade":
-                    (skills / source.name).symlink_to(source, target_is_directory=True)
+            shutil.copytree(ROOT / "generated", temporary_root / "generated")
+            shutil.rmtree(temporary_root / "generated/gstack-codex/gstack-upgrade")
             with self.assertRaisesRegex(ValueError, "missing generated gstack skill: gstack-upgrade"):
                 validate_gstack_catalog(temporary_root)
 

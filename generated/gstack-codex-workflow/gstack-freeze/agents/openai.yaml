@@ -1,0 +1,6 @@
+interface:
+  display_name: "gstack-freeze"
+  short_description: "Use the $gstack-freeze workflow."
+  default_prompt: "Invoke $gstack-freeze for this task."
+policy:
+  allow_implicit_invocation: true

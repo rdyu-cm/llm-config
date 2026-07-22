@@ -301,3 +301,9 @@ name = "gstack-codex-skills"
 kind = "generated-skills"
 path = "generated/gstack-codex"
 classification = "supported"
+
+[[components]]
+name = "gstack-codex-workflow-skills"
+kind = "generated-skills"
+path = "generated/gstack-codex-workflow"
+classification = "supported"

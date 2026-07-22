@@ -138,7 +138,7 @@ echo "GSTACK_PLAN_MODE: $GSTACK_PLAN_MODE"
 
 ## Plan Mode Safe Operations
 
-In plan mode, allowed because they inform the plan: `$B`, `$D`, `codex exec`/`codex review`, writes to `~/.gstack/`, and writes to the plan file.
+In plan mode, allowed because they inform the plan: `$B`, `$D`, `codex exec`/`codex review`, writes to `~/.gstack/`, writes to the plan file, and `open` for generated artifacts.
 
 ## Skill Invocation During Plan Mode
 
@@ -177,11 +177,14 @@ touch ~/.gstack/.writing-style-prompted
 
 Skip if `WRITING_STYLE_PENDING` is `no`.
 
-If `LAKE_INTRO` is `no`: say "gstack follows the **Boil the Ocean** principle — do the complete thing when AI makes marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean". Report the URL above without launching it, then run:
+If `LAKE_INTRO` is `no`: say "gstack follows the **Boil the Ocean** principle — do the complete thing when AI makes marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean" Offer to open:
 
 ```bash
+open https://garryslist.org/posts/boil-the-ocean
 touch ~/.gstack/.completeness-intro-seen
 ```
+
+Only run `open` if yes. Always run `touch`.
 
 If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: ask telemetry once via AskUserQuestion:
 
@@ -789,9 +792,41 @@ Replace `SKILL_NAME`, `OUTCOME`, and `USED_BROWSE` before running.
 
 Skills that run plan reviews (`/plan-*-review`, `/codex review`) include the EXIT PLAN MODE GATE blocking checklist at the end of the skill, which verifies the plan file ends with `## GSTACK REVIEW REPORT` before ExitPlanMode is called. Skills that don't run plan reviews (operational skills like `/ship`, `/qa`, `/review`) typically don't operate in plan mode and have no review report to verify; this footer is a no-op for them. Writing the plan file is the one edit allowed in plan mode.
 
-## Browser-free workflow
+## SETUP (run this check BEFORE any browse command)
 
-Skip browser preview and setup. Do not install or recommend browser tooling. Continue the text/artifact workflow and report the saved artifact path whenever a preview file is produced.
+```bash
+_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+B=""
+[ -n "$_ROOT" ] && [ -x "$_ROOT/.agents/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.agents/skills/gstack/browse/dist/browse"
+[ -z "$B" ] && B="$GSTACK_BROWSE/browse"
+if [ -x "$B" ]; then
+  echo "READY: $B"
+else
+  echo "NEEDS_SETUP"
+fi
+```
+
+If `NEEDS_SETUP`:
+1. Tell the user: "gstack browse needs a one-time build (~10 seconds). OK to proceed?" Then STOP and wait.
+2. Run: `cd <SKILL_DIR> && ./setup`
+3. If `bun` is not installed:
+   ```bash
+   if ! command -v bun >/dev/null 2>&1; then
+     BUN_VERSION="1.3.10"
+     BUN_INSTALL_SHA="bab8acfb046aac8c72407bdcce903957665d655d7acaa3e11c7c4616beae68dd"
+     tmpfile=$(mktemp)
+     curl -fsSL "https://bun.sh/install" -o "$tmpfile"
+     actual_sha=$(shasum -a 256 "$tmpfile" | awk '{print $1}')
+     if [ "$actual_sha" != "$BUN_INSTALL_SHA" ]; then
+       echo "ERROR: bun install script checksum mismatch" >&2
+       echo "  expected: $BUN_INSTALL_SHA" >&2
+       echo "  got:      $actual_sha" >&2
+       rm "$tmpfile"; exit 1
+     fi
+     BUN_VERSION="$BUN_VERSION" bash "$tmpfile"
+     rm "$tmpfile"
+   fi
+   ```
 
 # YC Office Hours
 
@@ -1269,19 +1304,35 @@ $D variants --brief "<assembled brief>" --count 3 --output-dir "$_DESIGN_DIR/"
 
 This generates 3 style variations of the same brief (~40 seconds total).
 
-**Step 4: Save the comparison artifact**
+**Step 4: Show variants inline, then open comparison board**
 
-Show each variant inline with the Read tool, then write the comparison HTML:
+Show each variant to the user inline first (read the PNGs with Read tool), then
+create and serve the comparison board:
 
 ```bash
-$D compare --images "$_DESIGN_DIR/variant-A.png,$_DESIGN_DIR/variant-B.png,$_DESIGN_DIR/variant-C.png" --output "$_DESIGN_DIR/design-board.html"
+$D compare --images "$_DESIGN_DIR/variant-A.png,$_DESIGN_DIR/variant-B.png,$_DESIGN_DIR/variant-C.png" --output "$_DESIGN_DIR/design-board.html" --serve
 ```
 
-Report the saved comparison artifact path. Do not start a server or launch a browser.
+This opens the board in the user's default browser and blocks until feedback is
+received. Read stdout for the structured JSON result. No polling needed.
 
-**Step 5: Continue in text**
+If `$D serve` is not available or fails, fall back to AskUserQuestion:
+"I've opened the design board. Which variant do you prefer? Any feedback?"
 
-Skip the browser-only comparison loop. Use the inline variants and AskUserQuestion for any necessary choice, then continue the text workflow.
+**Step 5: Handle feedback**
+
+If the JSON contains `"regenerated": true`:
+1. Read `regenerateAction` (or `remixSpec` for remix requests)
+2. Generate new variants with `$D iterate` or `$D variants` using updated brief
+3. Create new board with `$D compare`
+4. POST the new HTML to the running board. Parse the board URL from stderr
+   (`BOARD_URL: http://127.0.0.1:N/boards/<id>/` — the daemon path) or fall
+   back to the legacy port (`SERVE_STARTED: port=N` — only emitted under
+   `--no-daemon`, hits `/api/reload` root). Daemon path:
+   `curl -X POST "${BOARD_URL}api/reload" -H 'Content-Type: application/json' -d '{"html":"$_DESIGN_DIR/design-board.html"}'`
+5. Board auto-refreshes in the same tab
+
+If `"regenerated": false`: proceed with the approved variant.
 
 **Step 6: Save approved choice**
 
@@ -1326,17 +1377,28 @@ Write to a temp file:
 SKETCH_FILE="/tmp/gstack-sketch-$(date +%s).html"
 ```
 
-**Step 3: Keep the HTML artifact**
+**Step 3: Render and capture**
 
-Do not launch a preview or capture a screenshot. Report the HTML artifact path in `SKETCH_FILE`, skip browser-only iteration, and continue the text workflow.
+```bash
+$B goto "file://$SKETCH_FILE"
+$B screenshot /tmp/gstack-sketch.png
+```
 
-**Step 4: Continue without preview**
+If `$B` is not available (browse binary not set up), skip the render step. Tell the
+user: "Visual sketch requires the browse binary. Run the setup script to enable it."
 
-Record any textual feedback directly in the HTML or design doc.
+**Step 4: Present and iterate**
+
+Show the screenshot to the user. Ask: "Does this feel right? Want to iterate on the layout?"
+
+If they want changes, regenerate the HTML with their feedback and re-render.
+If they approve or say "good enough," proceed.
 
 **Step 5: Include in design doc**
 
-Reference the saved HTML artifact in the design doc's Recommended Approach section.
+Reference the wireframe screenshot in the design doc's "Recommended Approach" section.
+The screenshot file at `/tmp/gstack-sketch.png` can be referenced by downstream skills
+(`/plan-design-review`, `/design-review`) to see what was originally envisioned.
 
 **Step 6: Outside design voices** (optional)
 
@@ -1738,7 +1800,7 @@ Use the founder signal count from Phase 4.5 to select the right sub-tier.
 > GStack thinks you are among the top people who could do this.
 
 Then use AskUserQuestion: "Would you consider applying to Y Combinator?"
-- If yes: report `https://ycombinator.com/apply?ref=gstack` and say: "Bring this design doc to your YC interview. It's better than most pitch decks."
+- If yes: run `open https://ycombinator.com/apply?ref=gstack` and say: "Bring this design doc to your YC interview. It's better than most pitch decks."
 - If no: respond warmly: "Totally fair. The design doc is yours either way, and the offer stands if you ever change your mind." No pressure, no guilt, no re-ask.
 
 - **Middle tier** (1-2 signals, or builder whose project solves a real problem):
@@ -1815,10 +1877,10 @@ This must feel earned, not broadcast. If the evidence doesn't support it, skip e
 
 **Builder Journey Summary** (session 5+): Auto-generate `~/.gstack/builder-journey.md`
 with a narrative arc (not a data table). The arc tells the STORY of their journey in
-second person, referencing specific things they said across sessions. Then report its artifact path:
+second person, referencing specific things they said across sessions. Then open it:
 ```bash
 eval "$($GSTACK_ROOT/bin/gstack-paths)"
-printf '%s\n' "$GSTACK_STATE_ROOT/builder-journey.md"
+open "$GSTACK_STATE_ROOT/builder-journey.md"
 ```
 
 Then proceed to Founder Resources below.
@@ -1833,7 +1895,7 @@ The data speaks. No pitch needed.
 
 Full accumulated signal summary from the profile.
 
-Auto-generate updated `~/.gstack/builder-journey.md` with narrative arc and report its artifact path.
+Auto-generate updated `~/.gstack/builder-journey.md` with narrative arc. Open it.
 
 Then proceed to Founder Resources below.
 
@@ -1930,7 +1992,20 @@ mkdir -p ~/.gstack/analytics
 echo '{"skill":"office-hours","event":"resources_shown","count":NUM_RESOURCES,"categories":"CAT1,CAT2","ts":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
 ```
 
-3. Present the selected resource URLs directly in the response. Do not launch them. Then continue to next-skill recommendations.
+3. Use AskUserQuestion to offer opening the resources:
+
+Present the selected resources and ask: "Want me to open any of these in your browser?"
+
+Options:
+- A) Open all of them (I'll check them out later)
+- B) [Title of resource 1] — open just this one
+- C) [Title of resource 2] — open just this one
+- D) [Title of resource 3, if 3 were shown] — open just this one
+- E) Skip — I'll find them later
+
+If A: run `open URL1 && open URL2 && open URL3` (opens each in default browser).
+If B/C/D: run `open` on the selected URL only.
+If E: proceed to next-skill recommendations.
 
 ### Next-skill recommendations — hand the user into the loop
 

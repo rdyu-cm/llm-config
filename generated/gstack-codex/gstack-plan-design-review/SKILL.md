@@ -134,7 +134,7 @@ echo "GSTACK_PLAN_MODE: $GSTACK_PLAN_MODE"
 
 ## Plan Mode Safe Operations
 
-In plan mode, allowed because they inform the plan: `$B`, `$D`, `codex exec`/`codex review`, writes to `~/.gstack/`, and writes to the plan file.
+In plan mode, allowed because they inform the plan: `$B`, `$D`, `codex exec`/`codex review`, writes to `~/.gstack/`, writes to the plan file, and `open` for generated artifacts.
 
 ## Skill Invocation During Plan Mode
 
@@ -173,11 +173,14 @@ touch ~/.gstack/.writing-style-prompted
 
 Skip if `WRITING_STYLE_PENDING` is `no`.
 
-If `LAKE_INTRO` is `no`: say "gstack follows the **Boil the Ocean** principle — do the complete thing when AI makes marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean". Report the URL above without launching it, then run:
+If `LAKE_INTRO` is `no`: say "gstack follows the **Boil the Ocean** principle — do the complete thing when AI makes marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean" Offer to open:
 
 ```bash
+open https://garryslist.org/posts/boil-the-ocean
 touch ~/.gstack/.completeness-intro-seen
 ```
+
+Only run `open` if yes. Always run `touch`.
 
 If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: ask telemetry once via AskUserQuestion:
 
@@ -1050,7 +1053,7 @@ B=""
 if [ -x "$B" ]; then
   echo "BROWSE_READY: $B"
 else
-  echo "BROWSE_NOT_AVAILABLE (comparison board will remain a saved artifact)"
+  echo "BROWSE_NOT_AVAILABLE (will use 'open' to view comparison boards)"
 fi
 ```
 
@@ -1058,14 +1061,15 @@ If `DESIGN_NOT_AVAILABLE`: skip visual mockup generation and fall back to the
 existing HTML wireframe approach (`DESIGN_SKETCH`). Design mockups are a
 progressive enhancement, not a hard requirement.
 
-If `BROWSE_NOT_AVAILABLE`: save the comparison board HTML, report its artifact path,
-and continue the non-browser review flow. Do not invoke a system browser.
+If `BROWSE_NOT_AVAILABLE`: use `open file://...` instead of `$B goto` to open
+comparison boards. The user just needs to see the HTML file in any browser.
 
 If `DESIGN_READY`: the design binary is available for visual mockup generation.
 Commands:
 - `$D generate --brief "..." --output /path.png` — generate a single mockup
 - `$D variants --brief "..." --count 3 --output-dir /path/` — generate N style variants
-- `$D compare --images "a.png,b.png,c.png" --output /path/board.html` — write the comparison board HTML artifact
+- `$D compare --images "a.png,b.png,c.png" --output /path/board.html --serve` — comparison board + HTTP server
+- `$D serve --html /path/board.html` — serve comparison board and collect feedback via HTTP
 - `$D check --image /path.png --brief "..."` — vision quality gate
 - `$D iterate --session /path/session.json --feedback "..." --output /path.png` — iterate
 
@@ -1158,6 +1162,7 @@ planning phase. Generating mockups during planning is the whole point.
 Allowed commands under this exception:
 - `mkdir -p ~/.gstack/projects/$SLUG/designs/...`
 - `$D generate`, `$D variants`, `$D compare`, `$D iterate`, `$D evolve`, `$D check`
+- `open` (fallback for viewing boards when `$B` is not available)
 
 First, set up the output directory. Name it after the screen/feature being designed and today's date:
 
@@ -1189,17 +1194,134 @@ $D check --image "$_DESIGN_DIR/variant-A.png" --brief "<the original brief>"
 
 Flag any variants that fail the quality check. Offer to regenerate failures.
 
-**Artifact-only comparison**
+**Do NOT show variants inline via Read tool and ask for preferences.** Proceed
+directly to the Comparison Board + Feedback Loop section below. The comparison board
+IS the chooser — it has rating controls, comments, remix/regenerate, and structured
+feedback output. Showing mockups inline is a degraded experience.
 
-If `DESIGN_READY`, show generated variants inline with the Read tool and write the comparison artifact:
+### Comparison Board + Feedback Loop
+
+Create the comparison board and serve it over HTTP:
 
 ```bash
-$D compare --images "$_DESIGN_DIR/variant-A.png,$_DESIGN_DIR/variant-B.png,$_DESIGN_DIR/variant-C.png" --output "$_DESIGN_DIR/design-board.html"
+$D compare --images "$_DESIGN_DIR/variant-A.png,$_DESIGN_DIR/variant-B.png,$_DESIGN_DIR/variant-C.png" --output "$_DESIGN_DIR/design-board.html" --serve
 ```
 
-Report the saved comparison artifact path. Do not start a server or launch a browser. Skip the browser-only feedback loop and continue the text review, using AskUserQuestion for genuine design choices.
+This command generates the board HTML, starts an HTTP server on a random port,
+and opens it in the user's default browser. **Run it in the background** with `&`
+because the server needs to stay running while the user interacts with the board.
 
-If `DESIGN_NOT_AVAILABLE`, skip visual generation and setup guidance. Continue the text review and report any artifacts already produced.
+Parse the board URL from stderr output. Default daemon path:
+`BOARD_URL: http://127.0.0.1:N/boards/<id>/` (already includes the per-board
+path; use this for the AskUserQuestion URL AND as the base for the reload
+endpoint). Legacy `--no-daemon` path emits `SERVE_STARTED: port=XXXXX` and
+serves a single board at `/`, with reload at `/api/reload` — only relevant
+when an external caller explicitly passes `--no-daemon`.
+
+**PRIMARY WAIT: AskUserQuestion with board URL**
+
+After the board is serving, use AskUserQuestion to wait for the user. Include the
+board URL so they can click it if they lost the browser tab:
+
+"I've opened a comparison board with the design variants:
+<BOARD_URL> — Rate them, leave comments, remix
+elements you like, and click Submit when you're done. Let me know when you've
+submitted your feedback (or paste your preferences here). If you clicked
+Regenerate or Remix on the board, tell me and I'll generate new variants."
+
+Substitute `<BOARD_URL>` with the URL parsed from stderr (the daemon path
+emits `BOARD_URL: http://127.0.0.1:N/boards/<id>/`).
+
+**Do NOT use AskUserQuestion to ask which variant the user prefers.** The comparison
+board IS the chooser. AskUserQuestion is just the blocking wait mechanism.
+
+**After the user responds to AskUserQuestion:**
+
+Check for feedback files next to the board HTML:
+- `$_DESIGN_DIR/feedback.json` — written when user clicks Submit (final choice)
+- `$_DESIGN_DIR/feedback-pending.json` — written when user clicks Regenerate/Remix/More Like This
+
+```bash
+if [ -f "$_DESIGN_DIR/feedback.json" ]; then
+  echo "SUBMIT_RECEIVED"
+  cat "$_DESIGN_DIR/feedback.json"
+elif [ -f "$_DESIGN_DIR/feedback-pending.json" ]; then
+  echo "REGENERATE_RECEIVED"
+  cat "$_DESIGN_DIR/feedback-pending.json"
+  rm "$_DESIGN_DIR/feedback-pending.json"
+else
+  echo "NO_FEEDBACK_FILE"
+fi
+```
+
+The feedback JSON has this shape:
+```json
+{
+  "preferred": "A",
+  "ratings": { "A": 4, "B": 3, "C": 2 },
+  "comments": { "A": "Love the spacing" },
+  "overall": "Go with A, bigger CTA",
+  "regenerated": false
+}
+```
+
+**If `feedback.json` found:** The user clicked Submit on the board.
+Read `preferred`, `ratings`, `comments`, `overall` from the JSON. Proceed with
+the approved variant.
+
+**If `feedback-pending.json` found:** The user clicked Regenerate/Remix on the board.
+1. Read `regenerateAction` from the JSON (`"different"`, `"match"`, `"more_like_B"`,
+   `"remix"`, or custom text)
+2. If `regenerateAction` is `"remix"`, read `remixSpec` (e.g. `{"layout":"A","colors":"B"}`)
+3. Generate new variants with `$D iterate` or `$D variants` using updated brief
+4. Create new board: `$D compare --images "..." --output "$_DESIGN_DIR/design-board.html"`
+5. Reload the board in the user's browser (same tab) — the URL is per-board
+   under daemon mode, so use `<BOARD_URL>` (from the `BOARD_URL:` stderr
+   line) as the base:
+   `curl -s -X POST "${BOARD_URL}api/reload" -H 'Content-Type: application/json' -d '{"html":"$_DESIGN_DIR/design-board.html"}'`
+   Under `--no-daemon` the reload endpoint is `/api/reload` at the legacy
+   port; this path only matters if the caller explicitly opted out of the
+   daemon.
+6. The board auto-refreshes. **AskUserQuestion again** with the same board URL to
+   wait for the next round of feedback. Repeat until `feedback.json` appears.
+
+**If `NO_FEEDBACK_FILE`:** The user typed their preferences directly in the
+AskUserQuestion response instead of using the board. Use their text response
+as the feedback.
+
+**POLLING FALLBACK:** Only use polling if `$D serve` fails (no port available).
+In that case, show each variant inline using the Read tool (so the user can see them),
+then use AskUserQuestion:
+"The comparison board server failed to start. I've shown the variants above.
+Which do you prefer? Any feedback?"
+
+**After receiving feedback (any path):** Output a clear summary confirming
+what was understood:
+
+"Here's what I understood from your feedback:
+PREFERRED: Variant [X]
+RATINGS: [list]
+YOUR NOTES: [comments]
+DIRECTION: [overall]
+
+Is this right?"
+
+Use AskUserQuestion to verify before proceeding.
+
+**Save the approved choice:**
+```bash
+echo '{"approved_variant":"<V>","feedback":"<FB>","date":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","screen":"<SCREEN>","branch":"'$(git branch --show-current 2>/dev/null)'"}' > "$_DESIGN_DIR/approved.json"
+```
+
+**Do NOT use AskUserQuestion to ask which variant the user picked.** Read `feedback.json` — it already contains their preferred variant, ratings, comments, and overall feedback. Only use AskUserQuestion to confirm you understood the feedback correctly, never to re-ask what they chose.
+
+Note which direction was approved. This becomes the visual reference for all subsequent review passes.
+
+**Multiple variants/screens:** If the user asked for multiple variants (e.g., "5 versions of the homepage"), generate ALL as separate variant sets with their own comparison boards. Each screen/variant set gets its own subdirectory under `designs/`. Complete all mockup generation and user selection before starting review passes.
+
+**If `DESIGN_NOT_AVAILABLE`:** Tell the user: "The gstack designer isn't set up yet. Run `$D setup` to enable visual mockups. Proceeding with text-only review, but you're missing the best part." Then proceed to review passes with text-based review.
+
+
 
 ## The 0-10 Rating Method
 
@@ -1399,7 +1521,7 @@ Follow the AskUserQuestion format from the Preamble above. Additional rules for 
 * **Map to Design Principles above.** One sentence connecting your recommendation to a specific principle.
 * Label with issue NUMBER + option LETTER (e.g., "3A", "3B").
 * **Zero findings:** if a section has zero findings, state "No issues, moving on" and proceed. Otherwise, use AskUserQuestion for each gap — a gap with an "obvious fix" is still a gap and still needs user approval before any change lands in the plan.
-* Use AskUserQuestion for any necessary variant preference in the text workflow. Do not serve or launch the comparison artifact.
+* **NEVER use AskUserQuestion to ask which variant the user prefers.** Always create a comparison board first (`$D compare --serve`) and open it in the browser. The board has rating controls, comments, remix/regenerate buttons, and structured feedback output. Use AskUserQuestion ONLY to notify the user the board is open and wait for them to finish — not to present variants inline and ask "which do you prefer?" That is a degraded experience.
 
 ## Required Outputs
 

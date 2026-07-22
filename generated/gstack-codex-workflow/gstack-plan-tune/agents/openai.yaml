@@ -1,0 +1,6 @@
+interface:
+  display_name: "gstack-plan-tune"
+  short_description: "Use the $gstack-plan-tune workflow."
+  default_prompt: "Invoke $gstack-plan-tune for this task."
+policy:
+  allow_implicit_invocation: true

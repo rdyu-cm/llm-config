@@ -23,6 +23,7 @@ UPDATE_PATHS = (
     "vendor/gstack",
     "vendor/gstack-source.toml",
     "generated/gstack-codex",
+    "generated/gstack-codex-workflow",
     "sources.lock.toml",
 )
 RUNTIME_PATH_VARIABLES = ("GSTACK_BROWSE", "GSTACK_DESIGN", "GSTACK_MAKE_PDF")
@@ -159,8 +160,24 @@ def _validate_candidate_inventory(root: Path, vendor: Path) -> None:
         )
 
 
-def _validate_generated_tree(root: Path, generated: Path) -> None:
-    expected = _catalog_skill_names(root)
+def _catalog_generated_root(root: Path, profile: str) -> Path:
+    catalog = _load_catalog(root)
+    relative = catalog.get("profiles", {}).get(profile, {}).get("generated_root")
+    expected = {
+        "full": "generated/gstack-codex",
+        "workflow": "generated/gstack-codex-workflow",
+    }.get(profile)
+    if relative != expected:
+        raise ValueError(f"gstack {profile} profile must use generated root {expected}")
+    return root / relative
+
+
+def _validate_generated_tree(root: Path, generated: Path, profile: str = "full") -> None:
+    expected = (
+        _catalog_skill_names(root)
+        if profile == "full"
+        else _catalog_workflow_skill_names(root)
+    )
     actual = {path.name for path in generated.iterdir() if path.is_dir() and not path.is_symlink()}
     if actual != expected:
         missing = ", ".join(sorted(expected - actual))
@@ -189,7 +206,7 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
                 raise ValueError(
                     f"generated gstack skill uses {variable} without initialization: {name}"
                 )
-        if name == "gstack-office-hours":
+        if profile == "workflow" and name == "gstack-office-hours":
             browser_setup_fallbacks = (
                 "NEEDS_SETUP",
                 "cd <SKILL_DIR> && ./setup",
@@ -213,7 +230,7 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
                         "generated gstack skill is missing its optional browser fallback: "
                         "gstack-office-hours"
                     )
-        if name == "gstack-plan-design-review":
+        if profile == "workflow" and name == "gstack-plan-design-review":
             if any(
                 fallback in frontmatter
                 for fallback in ("open file://", "--serve", "$D serve")
@@ -233,7 +250,7 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
                         "generated gstack skill is missing its optional browser fallback: "
                         "gstack-plan-design-review"
                     )
-        trusted_skill = root / "generated/gstack-codex" / name / "SKILL.md"
+        trusted_skill = _catalog_generated_root(root, profile) / name / "SKILL.md"
         if trusted_skill.is_file() and not trusted_skill.is_symlink():
             trusted_text = trusted_skill.read_text(encoding="utf-8")
             for initialization in ("GSTACK_ROOT=", "GSTACK_BIN="):
@@ -510,11 +527,17 @@ def _candidate_skill_path(vendor: Path, name: str) -> Path:
     return vendor / relative / "SKILL.md"
 
 
-def generate_codex_skills(root: Path, staged_vendor: Path, staged_generated: Path) -> None:
-    trusted_generated = root / "generated/gstack-codex"
+def generate_codex_skills(
+    root: Path, staged_vendor: Path, staged_generated: Path, profile: str = "full"
+) -> None:
+    trusted_generated = _catalog_generated_root(root, profile)
     trusted_vendor = root / "vendor/gstack"
-    workflow_skills = _catalog_workflow_skill_names(root)
-    for name in sorted(_catalog_skill_names(root)):
+    names = (
+        _catalog_skill_names(root)
+        if profile == "full"
+        else _catalog_workflow_skill_names(root)
+    )
+    for name in sorted(names):
         destination = staged_generated / name
         source = _candidate_skill_path(staged_vendor, name)
         trusted_source = _candidate_skill_path(trusted_vendor, name)
@@ -532,7 +555,7 @@ def generate_codex_skills(root: Path, staged_vendor: Path, staged_generated: Pat
             shutil.copytree(fallback, destination)
         elif not source.is_symlink():
             destination.mkdir()
-            workflow_safe = name in workflow_skills
+            workflow_safe = profile == "workflow"
             adapted = _adapt_codex_skill(
                 source.read_text(encoding="utf-8"), name, workflow_safe=workflow_safe
             )
@@ -640,7 +663,8 @@ def _ensure_targets_clean(root: Path) -> None:
 def _run_trusted_integration_gate(root: Path, candidate: str) -> None:
     validate_candidate(candidate)
     validate_vendor_tree(root / "vendor/gstack")
-    _validate_generated_tree(root, root / "generated/gstack-codex")
+    _validate_generated_tree(root, _catalog_generated_root(root, "full"), "full")
+    _validate_generated_tree(root, _catalog_generated_root(root, "workflow"), "workflow")
 
     source = _gstack_source(root)
     if source["commit"] != candidate:
@@ -665,16 +689,24 @@ def _run_trusted_integration_gate(root: Path, candidate: str) -> None:
         raise RuntimeError(f"trusted repository validation failed: {detail}")
 
 
-def _install_update(root: Path, candidate: str, staged_vendor: Path, staged_generated: Path) -> None:
+def _install_update(
+    root: Path,
+    candidate: str,
+    staged_vendor: Path,
+    staged_full: Path,
+    staged_workflow: Path,
+) -> None:
     vendor_target = root / "vendor/gstack"
-    generated_target = root / "generated/gstack-codex"
+    full_target = _catalog_generated_root(root, "full")
+    workflow_target = _catalog_generated_root(root, "workflow")
     lock_path = root / "sources.lock.toml"
     metadata_path = root / "vendor/gstack-source.toml"
     lock_before = _read_text_exact(lock_path)
     metadata_before = _read_text_exact(metadata_path)
     replacements = (
         (staged_vendor, vendor_target),
-        (staged_generated, generated_target),
+        (staged_full, full_target),
+        (staged_workflow, workflow_target),
     )
     backups: list[tuple[Path, Path]] = []
 
@@ -692,7 +724,8 @@ def _install_update(root: Path, candidate: str, staged_vendor: Path, staged_gene
 
     try:
         replace_directory(staged_vendor, vendor_target)
-        replace_directory(staged_generated, generated_target)
+        replace_directory(staged_full, full_target)
+        replace_directory(staged_workflow, workflow_target)
         update_lock_commit(lock_path, candidate)
         write_source_metadata(metadata_path, candidate)
         _run_trusted_integration_gate(root, candidate)
@@ -751,20 +784,29 @@ def prepare_update(root: Path, candidate: str, archive: Path) -> None:
         if not generated_parent.is_dir() or generated_parent.is_symlink():
             raise ValueError("repository generated directory is missing or unsafe")
         staged_vendor = Path(tempfile.mkdtemp(prefix=".gstack-stage-", dir=vendor_parent))
-        staged_generated = Path(tempfile.mkdtemp(prefix=".gstack-codex-stage-", dir=generated_parent))
+        staged_full = Path(tempfile.mkdtemp(prefix=".gstack-codex-stage-", dir=generated_parent))
+        staged_workflow = Path(
+            tempfile.mkdtemp(prefix=".gstack-codex-workflow-stage-", dir=generated_parent)
+        )
         try:
             shutil.copytree(extracted, staged_vendor, dirs_exist_ok=True)
             validate_vendor_tree(staged_vendor)
-            generate_codex_skills(root, staged_vendor, staged_generated)
+            generate_codex_skills(root, staged_vendor, staged_full, "full")
+            generate_codex_skills(root, staged_vendor, staged_workflow, "workflow")
             validate_vendor_tree(staged_vendor)
-            _validate_generated_tree(root, staged_generated)
+            _validate_generated_tree(root, staged_full, "full")
+            _validate_generated_tree(root, staged_workflow, "workflow")
 
-            _install_update(root, candidate, staged_vendor, staged_generated)
+            _install_update(
+                root, candidate, staged_vendor, staged_full, staged_workflow
+            )
         finally:
             if staged_vendor.exists():
                 shutil.rmtree(staged_vendor)
-            if staged_generated.exists():
-                shutil.rmtree(staged_generated)
+            if staged_full.exists():
+                shutil.rmtree(staged_full)
+            if staged_workflow.exists():
+                shutil.rmtree(staged_workflow)
 
 
 def _gstack_source(root: Path) -> dict:

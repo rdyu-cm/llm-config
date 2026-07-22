@@ -1,0 +1,6 @@
+interface:
+  display_name: "gstack-context-save"
+  short_description: "Use the $gstack-context-save workflow."
+  default_prompt: "Invoke $gstack-context-save for this task."
+policy:
+  allow_implicit_invocation: true

@@ -142,80 +142,88 @@ def validate_gstack_catalog(root: Path) -> int:
     if not isinstance(profiles, dict):
         fail("gstack-capabilities.toml is missing profiles")
 
+    expected_roots = {
+        "workflow": "generated/gstack-codex-workflow",
+        "full": "generated/gstack-codex",
+    }
     lists: dict[str, list[str]] = {}
+    generated_roots: dict[str, Path] = {}
     for profile in ("workflow", "full"):
-        skills = profiles.get(profile, {}).get("skills")
+        profile_data = profiles.get(profile, {})
+        skills = profile_data.get("skills")
         if not isinstance(skills, list) or not all(isinstance(name, str) for name in skills):
             fail(f"gstack {profile} profile must contain a skills list")
         if len(skills) != len(set(skills)):
             fail(f"gstack {profile} profile contains duplicate skill names")
-        lists[profile] = skills
-
-    for profile, skills in lists.items():
+        if profile_data.get("generated_root") != expected_roots[profile]:
+            fail(
+                f"gstack {profile} profile must use generated root "
+                f"{expected_roots[profile]}"
+            )
         if "gstack-upgrade" in skills:
             fail(f"gstack-upgrade must not appear in the {profile} profile")
-
+        lists[profile] = skills
+        generated_roots[profile] = root / expected_roots[profile]
 
     full = set(lists["full"])
-    generated = {
-        path.name
-        for path in (root / "generated" / "gstack-codex").glob("gstack-*")
-        if path.is_dir()
-    }
-    expected_generated = full | {"gstack-upgrade"}
-    missing_generated = sorted(expected_generated - generated)
-    if missing_generated:
-        fail(f"missing generated gstack skill: {', '.join(missing_generated)}")
-    unlisted = sorted(generated - expected_generated)
-    if unlisted:
-        fail(f"generated gstack skills missing from full profile: {', '.join(unlisted)}")
-    for name in sorted(generated):
-        path = root / "generated" / "gstack-codex" / name / "SKILL.md"
-        if not path.is_file():
-            fail(f"missing generated gstack skill: {name}")
-        metadata = parse_frontmatter(path)
-        if metadata["name"] != name:
-            fail(f"generated gstack skill name does not match catalog: {name}")
-
-    for name in lists["workflow"]:
-        path = root / "generated" / "gstack-codex" / name / "SKILL.md"
-        violations = find_workflow_browser_policy_violations(
-            path.read_text(encoding="utf-8")
-        )
-        if violations:
-            fail(
-                f"gstack workflow browser launch policy violation in {name}: "
-                f"{'; '.join(violations)}"
-            )
-
-    sidecars = sorted((root / "generated" / "gstack-codex").glob("gstack-*/agents/openai.yaml"))
-    sidecar_names = {path.parents[1].name for path in sidecars}
-    missing_sidecars = sorted(generated - sidecar_names)
-    if missing_sidecars:
-        fail(f"generated gstack skills missing Codex metadata: {', '.join(missing_sidecars)}")
-    for path in sidecars:
-        name = path.parents[1].name
-        interface = parse_gstack_openai_metadata(path)["interface"]
-        if interface["display_name"] != name:
-            fail(f"gstack Codex metadata display name does not match: {name}")
-        short_description = interface["short_description"]
-        if not 25 <= len(short_description) <= 64:
-            fail(f"gstack Codex metadata description length is invalid: {name}")
-        if f"${name}" not in interface["default_prompt"]:
-            fail(f"gstack Codex metadata prompt does not invoke: {name}")
-
-
-
     missing = sorted(set(lists["workflow"]) - full)
     if missing:
         fail(f"gstack workflow skills missing from full profile: {', '.join(missing)}")
-    for name in lists["full"]:
-        path = root / "generated" / "gstack-codex" / name / "SKILL.md"
-        if not path.is_file():
-            fail(f"missing generated gstack skill: {name}")
-        metadata = parse_frontmatter(path)
-        if metadata["name"] != name:
-            fail(f"generated gstack skill name does not match catalog: {name}")
+
+    for profile in ("full", "workflow"):
+        generated_root = generated_roots[profile]
+        generated = {
+            path.name
+            for path in generated_root.glob("gstack-*")
+            if path.is_dir()
+        }
+        expected_generated = (full | {"gstack-upgrade"}) if profile == "full" else set(lists[profile])
+        missing_generated = sorted(expected_generated - generated)
+        if missing_generated:
+            fail(f"missing generated gstack skill: {', '.join(missing_generated)}")
+        unlisted = sorted(generated - expected_generated)
+        if unlisted:
+            fail(
+                f"generated gstack {profile} skills missing from {profile} profile: "
+                f"{', '.join(unlisted)}"
+            )
+
+        for name in sorted(generated):
+            path = generated_root / name / "SKILL.md"
+            if not path.is_file():
+                fail(f"missing generated gstack skill: {name}")
+            metadata = parse_frontmatter(path)
+            if metadata["name"] != name:
+                fail(f"generated gstack skill name does not match catalog: {name}")
+            if profile == "workflow":
+                violations = find_workflow_browser_policy_violations(
+                    path.read_text(encoding="utf-8")
+                )
+                if violations:
+                    fail(
+                        f"gstack workflow browser launch policy violation in {name}: "
+                        f"{'; '.join(violations)}"
+                    )
+
+        sidecars = sorted(generated_root.glob("gstack-*/agents/openai.yaml"))
+        sidecar_names = {path.parents[1].name for path in sidecars}
+        missing_sidecars = sorted(generated - sidecar_names)
+        if missing_sidecars:
+            fail(f"generated gstack skills missing Codex metadata: {', '.join(missing_sidecars)}")
+        extra_sidecars = sorted(sidecar_names - generated)
+        if extra_sidecars:
+            fail(f"generated gstack metadata has no skill: {', '.join(extra_sidecars)}")
+        for path in sidecars:
+            name = path.parents[1].name
+            interface = parse_gstack_openai_metadata(path)["interface"]
+            if interface["display_name"] != name:
+                fail(f"gstack Codex metadata display name does not match: {name}")
+            short_description = interface["short_description"]
+            if not 25 <= len(short_description) <= 64:
+                fail(f"gstack Codex metadata description length is invalid: {name}")
+            if f"${name}" not in interface["default_prompt"]:
+                fail(f"gstack Codex metadata prompt does not invoke: {name}")
+
     return len(lists["full"])
 
 

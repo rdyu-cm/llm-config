@@ -38,6 +38,12 @@ def write_archive(path: Path, members: dict[str, bytes]) -> None:
 
 
 class UpdateGstackTests(unittest.TestCase):
+    def test_bounded_update_paths_include_both_generated_bundles(self) -> None:
+        from scripts.update_gstack import UPDATE_PATHS
+
+        self.assertIn("generated/gstack-codex", UPDATE_PATHS)
+        self.assertIn("generated/gstack-codex-workflow", UPDATE_PATHS)
+
     def test_rejects_non_commit_candidate(self) -> None:
         for candidate in ("main", CANDIDATE.upper(), "a" * 39, "a" * 41):
             with self.subTest(candidate=candidate):
@@ -165,20 +171,34 @@ class UpdateGstackTests(unittest.TestCase):
         from scripts.update_gstack import generate_codex_skills
 
         with tempfile.TemporaryDirectory() as directory:
-            generated = Path(directory) / "gstack-codex"
-            generated.mkdir()
-            generate_codex_skills(ROOT, ROOT / "vendor/gstack", generated)
-            expected = ROOT / "generated/gstack-codex"
-            actual_files = sorted(
-                path.relative_to(generated) for path in generated.rglob("*") if path.is_file()
-            )
-            expected_files = sorted(
-                path.relative_to(expected) for path in expected.rglob("*") if path.is_file()
-            )
-            self.assertEqual(len(actual_files), 106)
-            self.assertEqual(actual_files, expected_files)
-            for relative in expected_files:
-                self.assertEqual((generated / relative).read_bytes(), (expected / relative).read_bytes(), relative)
+            for profile, root_name, expected_count in (
+                ("full", "gstack-codex", 106),
+                ("workflow", "gstack-codex-workflow", 56),
+            ):
+                generated = Path(directory) / root_name
+                generated.mkdir()
+                generate_codex_skills(
+                    ROOT, ROOT / "vendor/gstack", generated, profile
+                )
+                expected = ROOT / "generated" / root_name
+                actual_files = sorted(
+                    path.relative_to(generated)
+                    for path in generated.rglob("*")
+                    if path.is_file()
+                )
+                expected_files = sorted(
+                    path.relative_to(expected)
+                    for path in expected.rglob("*")
+                    if path.is_file()
+                )
+                self.assertEqual(len(actual_files), expected_count, profile)
+                self.assertEqual(actual_files, expected_files, profile)
+                for relative in expected_files:
+                    self.assertEqual(
+                        (generated / relative).read_bytes(),
+                        (expected / relative).read_bytes(),
+                        f"{profile}: {relative}",
+                    )
 
 
     def test_changed_candidate_skill_keeps_codex_adapter_invariants(self) -> None:
@@ -301,8 +321,9 @@ class UpdateGstackTests(unittest.TestCase):
             (root / "generated/gstack-codex/gstack-upgrade").mkdir()
             (root / "gstack-capabilities.toml").write_text(
                 'version = 1\n[bun]\nversion = "1.3.10"\n'
-                '[profiles.workflow]\nskills = ["gstack-test"]\n'
-                '[profiles.full]\nskills = ["gstack-test"]\n',
+                '[profiles.workflow]\ngenerated_root = "generated/gstack-codex-workflow"\n'
+                'skills = ["gstack-test"]\n[profiles.full]\n'
+                'generated_root = "generated/gstack-codex"\nskills = ["gstack-test"]\n',
                 encoding="utf-8",
             )
             for relative, name in (("test", "test"), ("gstack-upgrade", "gstack-upgrade")):
@@ -358,7 +379,8 @@ class UpdateGstackTests(unittest.TestCase):
             staged = root / "staged"
             (root / "generated/gstack-codex/gstack-test").mkdir(parents=True)
             (root / "gstack-capabilities.toml").write_text(
-                'version = 1\n[profiles.full]\nskills = ["gstack-test"]\n', encoding="utf-8"
+                'version = 1\n[profiles.full]\ngenerated_root = "generated/gstack-codex"\n'
+                'skills = ["gstack-test"]\n', encoding="utf-8"
             )
             (root / "generated/gstack-codex/gstack-test/SKILL.md").write_text(
                 "GSTACK_ROOT=x\nGSTACK_BIN=x\n", encoding="utf-8"
@@ -416,18 +438,18 @@ class UpdateGstackTests(unittest.TestCase):
         from scripts.update_gstack import _validate_generated_tree
 
         with tempfile.TemporaryDirectory() as directory:
-            generated = Path(directory) / "gstack-codex"
-            shutil.copytree(ROOT / "generated/gstack-codex", generated)
+            generated = Path(directory) / "gstack-codex-workflow"
+            shutil.copytree(ROOT / "generated/gstack-codex-workflow", generated)
             office_hours = generated / "gstack-office-hours/SKILL.md"
             office_hours.write_text(
                 office_hours.read_text(encoding="utf-8") + "\nNEEDS_SETUP\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "browser setup fallback"):
-                _validate_generated_tree(ROOT, generated)
+                _validate_generated_tree(ROOT, generated, "workflow")
 
             shutil.copy(
-                ROOT / "generated/gstack-codex/gstack-office-hours/SKILL.md",
+                ROOT / "generated/gstack-codex-workflow/gstack-office-hours/SKILL.md",
                 office_hours,
             )
             plan_design = generated / "gstack-plan-design-review/SKILL.md"
@@ -436,7 +458,7 @@ class UpdateGstackTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "system browser fallback"):
-                _validate_generated_tree(ROOT, generated)
+                _validate_generated_tree(ROOT, generated, "workflow")
 
     def test_replace_directory_restores_old_tree_when_install_rename_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -503,6 +525,12 @@ class UpdateGstackTests(unittest.TestCase):
             update_lock_commit(root / "sources.lock.toml", CANDIDATE)
             write_source_metadata(root / "vendor/gstack-source.toml", CANDIDATE)
             self._write_generated_fixture(root, root / "vendor/gstack", root / "generated/gstack-codex")
+            self._write_generated_fixture(
+                root,
+                root / "vendor/gstack",
+                root / "generated/gstack-codex-workflow",
+                "workflow",
+            )
             completed = subprocess.CompletedProcess([], 0, stdout="validated\n")
 
             with patch("scripts.update_gstack.subprocess.run", return_value=completed) as run:
@@ -542,9 +570,12 @@ class UpdateGstackTests(unittest.TestCase):
             archive = root / "candidate.tar.gz"
             self._make_valid_archive(archive)
 
-            def generate(_root: Path, staged_vendor: Path, staged_generated: Path) -> None:
+            def generate(
+                _root: Path, staged_vendor: Path, staged_generated: Path, profile: str
+            ) -> None:
                 self.assertEqual((staged_vendor / "LICENSE").read_text(encoding="utf-8"), "new license")
-                for name in ("gstack-test", "gstack-upgrade"):
+                names = ("gstack-test", "gstack-upgrade") if profile == "full" else ("gstack-test",)
+                for name in names:
                     skill = staged_generated / name
                     (skill / "agents").mkdir(parents=True)
                     (skill / "SKILL.md").write_text(
@@ -584,6 +615,8 @@ class UpdateGstackTests(unittest.TestCase):
                     "generated/gstack-codex/gstack-test/agents/openai.yaml",
                     "generated/gstack-codex/gstack-upgrade/SKILL.md",
                     "generated/gstack-codex/gstack-upgrade/agents/openai.yaml",
+                    "generated/gstack-codex-workflow/gstack-test/SKILL.md",
+                    "generated/gstack-codex-workflow/gstack-test/agents/openai.yaml",
                     "sources.lock.toml",
                     "vendor/gstack-source.toml",
                     "vendor/gstack/LICENSE",
@@ -614,8 +647,11 @@ class UpdateGstackTests(unittest.TestCase):
                     raise OSError("second replacement failed")
                 real_replace(staged, target)
 
-            def generate(_root: Path, _staged_vendor: Path, staged_generated: Path) -> None:
-                for name in ("gstack-test", "gstack-upgrade"):
+            def generate(
+                _root: Path, _staged_vendor: Path, staged_generated: Path, profile: str
+            ) -> None:
+                names = ("gstack-test", "gstack-upgrade") if profile == "full" else ("gstack-test",)
+                for name in names:
                     skill = staged_generated / name
                     (skill / "agents").mkdir(parents=True)
                     (skill / "SKILL.md").write_text(
@@ -720,11 +756,18 @@ class UpdateGstackTests(unittest.TestCase):
             "old skill",
         )
         self.assertFalse((root / "generated/gstack-codex/gstack-upgrade").exists())
+        self.assertEqual(
+            (root / "generated/gstack-codex-workflow/gstack-test/SKILL.md").read_text(),
+            "old workflow skill",
+        )
         self.assertIn('commit = "old"', (root / "sources.lock.toml").read_text())
         self.assertIn('commit = "old"', (root / "vendor/gstack-source.toml").read_text())
 
-    def _write_generated_fixture(self, _root: Path, _vendor: Path, generated: Path) -> None:
-        for name in ("gstack-test", "gstack-upgrade"):
+    def _write_generated_fixture(
+        self, _root: Path, _vendor: Path, generated: Path, profile: str = "full"
+    ) -> None:
+        names = ("gstack-test", "gstack-upgrade") if profile == "full" else ("gstack-test",)
+        for name in names:
             skill = generated / name
             (skill / "agents").mkdir(parents=True, exist_ok=True)
             (skill / "SKILL.md").write_text(
@@ -740,6 +783,7 @@ class UpdateGstackTests(unittest.TestCase):
     def _make_repository(self, root: Path) -> None:
         (root / "vendor/gstack/hosts").mkdir(parents=True)
         (root / "generated/gstack-codex/gstack-test/agents").mkdir(parents=True)
+        (root / "generated/gstack-codex-workflow/gstack-test/agents").mkdir(parents=True)
         (root / "vendor/gstack/LICENSE").write_text("old license", encoding="utf-8")
         (root / "vendor/gstack/setup").write_text("old setup", encoding="utf-8")
         (root / "vendor/gstack/package.json").write_text("old package", encoding="utf-8")
@@ -749,9 +793,17 @@ class UpdateGstackTests(unittest.TestCase):
         )
         (root / "generated/gstack-codex/gstack-test/SKILL.md").write_text("old skill", encoding="utf-8")
         (root / "generated/gstack-codex/gstack-test/agents/openai.yaml").write_text("old metadata", encoding="utf-8")
+        (root / "generated/gstack-codex-workflow/gstack-test/SKILL.md").write_text(
+            "old workflow skill", encoding="utf-8"
+        )
+        (root / "generated/gstack-codex-workflow/gstack-test/agents/openai.yaml").write_text(
+            "old workflow metadata", encoding="utf-8"
+        )
         (root / "gstack-capabilities.toml").write_text(
-            'version = 1\n[profiles.workflow]\nskills = ["gstack-test"]\n'
-            '[profiles.full]\nskills = ["gstack-test"]\n',
+            'version = 1\n[profiles.workflow]\n'
+            'generated_root = "generated/gstack-codex-workflow"\nskills = ["gstack-test"]\n'
+            '[profiles.full]\ngenerated_root = "generated/gstack-codex"\n'
+            'skills = ["gstack-test"]\n',
             encoding="utf-8",
         )
         (root / "sources.lock.toml").write_text(

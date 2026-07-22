@@ -65,6 +65,10 @@ class CapabilityBundleTests(unittest.TestCase):
             components["gstack-codex-skills"]["path"],
             "generated/gstack-codex",
         )
+        self.assertEqual(
+            components["gstack-codex-workflow-skills"]["path"],
+            "generated/gstack-codex-workflow",
+        )
     def test_catalog_includes_every_discovered_skill(self):
         with (ROOT / "capability-bundle.toml").open("rb") as handle:
             catalog = tomllib.load(handle)

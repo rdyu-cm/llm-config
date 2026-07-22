@@ -26,6 +26,29 @@ class InstallGstackTests(unittest.TestCase):
             state = json.loads((home / ".codex/gstack-managed.json").read_text())
             self.assertEqual(state["mode"], "workflow")
 
+    def test_profile_transitions_retarget_shared_skills_to_the_profile_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            shared = home / ".codex/skills/gstack-office-hours"
+
+            install(ROOT, home, "workflow", True)
+            self.assertEqual(
+                shared.resolve(),
+                ROOT / "generated/gstack-codex-workflow/gstack-office-hours",
+            )
+
+            install(ROOT, home, "full", True)
+            self.assertEqual(
+                shared.resolve(),
+                ROOT / "generated/gstack-codex/gstack-office-hours",
+            )
+
+            install(ROOT, home, "workflow", True)
+            self.assertEqual(
+                shared.resolve(),
+                ROOT / "generated/gstack-codex-workflow/gstack-office-hours",
+            )
+
     def test_switching_full_to_workflow_removes_only_managed_browser_links(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)

@@ -5,6 +5,7 @@ version = "1.3.10"
 installer_sha256 = "bab8acfb046aac8c72407bdcce903957665d655d7acaa3e11c7c4616beae68dd"
 
 [profiles.workflow]
+generated_root = "generated/gstack-codex-workflow"
 skills = [
   "gstack-autoplan", "gstack-benchmark-models", "gstack-careful",
   "gstack-context-restore", "gstack-context-save", "gstack-cso",
@@ -18,6 +19,7 @@ skills = [
 ]
 
 [profiles.full]
+generated_root = "generated/gstack-codex"
 skills = [
   "gstack-autoplan",
   "gstack-benchmark",

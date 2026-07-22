@@ -17,9 +17,11 @@ def desired_links(root: Path, home: Path, mode: str) -> dict[Path, Path]:
     if mode == "off":
         return {}
     catalog = load_catalog(root)
-    skills = catalog["profiles"][mode]["skills"]
+    profile = catalog["profiles"][mode]
+    skills = profile["skills"]
+    generated_root = root / profile["generated_root"]
     links = {
-        home / ".codex" / "skills" / name: root / "generated" / "gstack-codex" / name
+        home / ".codex" / "skills" / name: generated_root / name
         for name in skills
     }
     runtime = home / ".codex" / "skills" / "gstack"

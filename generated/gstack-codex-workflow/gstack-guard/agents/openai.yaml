@@ -1,0 +1,6 @@
+interface:
+  display_name: "gstack-guard"
+  short_description: "Use the $gstack-guard workflow."
+  default_prompt: "Invoke $gstack-guard for this task."
+policy:
+  allow_implicit_invocation: true

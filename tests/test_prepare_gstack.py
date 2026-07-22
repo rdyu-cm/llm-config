@@ -37,6 +37,24 @@ class PrepareGstackTests(unittest.TestCase):
         download.assert_not_called()
         run.assert_not_called()
 
+    def test_full_ubuntu_2604_x86_64_overrides_playwright_platform(self) -> None:
+        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+             patch("scripts.prepare_gstack.host_platform", return_value=("linux", "x86_64", "ubuntu", "26.04")), \
+             patch("scripts.prepare_gstack.subprocess.run") as run, \
+             patch("sys.stderr") as stderr:
+            prepare(ROOT, "full", True, {"PATH": ""})
+        chromium = run.call_args_list[-1]
+        self.assertEqual(chromium.kwargs["env"]["PLAYWRIGHT_HOST_PLATFORM_OVERRIDE"], "ubuntu24.04-x64")
+        stderr.write.assert_called()
+
+    def test_full_supported_or_other_arch_does_not_override_playwright_platform(self) -> None:
+        for platform_info in (("linux", "x86_64", "ubuntu", "24.04"), ("linux", "aarch64", "ubuntu", "26.04")):
+            with self.subTest(platform_info=platform_info), \
+                 patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+                 patch("scripts.prepare_gstack.host_platform", return_value=platform_info), \
+                 patch("scripts.prepare_gstack.subprocess.run") as run:
+                prepare(ROOT, "full", True, {"PATH": ""})
+            self.assertNotIn("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", run.call_args_list[-1].kwargs["env"])
     def test_checksum_mismatch_stops_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory, \
              patch("scripts.prepare_gstack.find_bun", return_value=None), \

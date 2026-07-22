@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import platform
 import urllib.request
 from pathlib import Path
 
@@ -39,6 +40,17 @@ def verify_sha256(path: Path, expected: str) -> None:
 def run_bun_installer(installer: Path, version: str, env: dict[str, str]) -> None:
     subprocess.run(["bash", str(installer), f"bun-v{version}"], env=env, check=True)
 
+def host_platform() -> tuple[str, str, str, str]:
+    values: dict[str, str] = {}
+    try:
+        for line in Path("/etc/os-release").read_text(encoding="utf-8").splitlines():
+            key, separator, value = line.partition("=")
+            if separator:
+                values[key] = value.strip().strip('"')
+    except OSError:
+        pass
+    return platform.system().lower(), platform.machine().lower(), values.get("ID", ""), values.get("VERSION_ID", "")
+
 
 def prepare(root: Path, mode: str, apply: bool, env: dict[str, str]) -> list[str]:
     if mode not in {"off", "workflow", "full"}:
@@ -70,25 +82,24 @@ def prepare(root: Path, mode: str, apply: bool, env: dict[str, str]) -> list[str
         return messages + [f"would   prepare gstack {mode}"]
     if mode == "workflow":
         return [f"ready   gstack {mode}"] if apply else [f"would   prepare gstack {mode}"]
-
     child_env = dict(env)
-    if mode == "workflow":
-        child_env["PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD"] = "1"
     subprocess.run(
         [str(bun), "install", "--frozen-lockfile"],
         cwd=root / "vendor/gstack",
         env=child_env,
         check=True,
     )
-    if mode == "full":
-        subprocess.run([str(bun), "run", "build"], cwd=root / "vendor/gstack", env=child_env, check=True)
-    if mode == "full":
-        subprocess.run(
-            [str(bun), "x", "playwright", "install", "chromium"],
-            cwd=root / "vendor/gstack",
-            env=child_env,
-            check=True,
-        )
+    subprocess.run([str(bun), "run", "build"], cwd=root / "vendor/gstack", env=child_env, check=True)
+    browser_env = dict(child_env)
+    if host_platform() == ("linux", "x86_64", "ubuntu", "26.04"):
+        browser_env["PLAYWRIGHT_HOST_PLATFORM_OVERRIDE"] = "ubuntu24.04-x64"
+        print("warning: Ubuntu 26.04 Chromium is unavailable; using Playwright Ubuntu 24.04 binaries", file=sys.stderr)
+    subprocess.run(
+        [str(bun), "x", "playwright", "install", "chromium"],
+        cwd=root / "vendor/gstack",
+        env=browser_env,
+        check=True,
+    )
     return messages + [f"ready   gstack {mode}"]
 
 

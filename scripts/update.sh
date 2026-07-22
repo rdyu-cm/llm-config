@@ -5,7 +5,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 if [ "${1:-}" = "--apply" ]; then
   echo "Automatic replacement is intentionally disabled." >&2
-  echo "Review upstream diffs, update sources.lock.toml, then reinstall audited paths with the Codex skill installer." >&2
+  echo "For gstack, run scripts/update-gstack.sh; for other sources, review upstream diffs, update sources.lock.toml, then reinstall audited paths with the Codex skill installer." >&2
   exit 2
 elif [ "${1:-}" != "" ]; then
   echo "usage: scripts/update.sh" >&2

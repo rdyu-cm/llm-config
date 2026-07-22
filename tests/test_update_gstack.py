@@ -130,6 +130,54 @@ class UpdateGstackTests(unittest.TestCase):
             self.assertFalse((root / "vendor").exists())
             self.assertFalse((root / "generated").exists())
 
+    def test_generation_never_executes_candidate_package_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = root / "candidate"
+            generated = root / "staged-generated"
+            fake_bin = root / "bin"
+            sentinel = root / "outside-sentinel"
+            (candidate / "test").mkdir(parents=True)
+            (candidate / "gstack-upgrade").mkdir()
+            generated.mkdir()
+            fake_bin.mkdir()
+            (root / "generated/gstack-codex/gstack-test").mkdir(parents=True)
+            (root / "generated/gstack-codex/gstack-upgrade").mkdir()
+            (root / "gstack-capabilities.toml").write_text(
+                'version = 1\n[bun]\nversion = "1.3.10"\n'
+                '[profiles.full]\nskills = ["gstack-test"]\n',
+                encoding="utf-8",
+            )
+            for relative, name in (("test", "test"), ("gstack-upgrade", "gstack-upgrade")):
+                (candidate / relative / "SKILL.md").write_text(
+                    f"---\nname: {name}\ndescription: Candidate data only.\n---\n"
+                    "Use ~/.claude/skills/gstack/bin safely.\n",
+                    encoding="utf-8",
+                )
+            (candidate / "package.json").write_text(
+                '{"scripts":{"gen:skill-docs":"touch $SENTINEL_PATH"}}\n',
+                encoding="utf-8",
+            )
+            fake_bun = fake_bin / "bun"
+            fake_bun.write_text(
+                '#!/bin/sh\n: > "$SENTINEL_PATH"\nprintf "1.3.10\\n"\n',
+                encoding="utf-8",
+            )
+            fake_bun.chmod(0o755)
+
+            from scripts.update_gstack import generate_codex_skills
+
+            with patch.dict(
+                os.environ,
+                {"PATH": str(fake_bin), "SENTINEL_PATH": str(sentinel)},
+            ):
+                generate_codex_skills(root, candidate, generated)
+
+            self.assertFalse(sentinel.exists())
+            adapted = (generated / "gstack-test/SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("name: gstack-test", adapted)
+            self.assertIn("$GSTACK_ROOT/bin", adapted)
+
     def test_codex_metadata_is_normalized_to_repository_policy(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             metadata = Path(directory) / "openai.yaml"
@@ -298,6 +346,8 @@ class UpdateGstackTests(unittest.TestCase):
                  patch("scripts.update_gstack.shutil.rmtree", side_effect=fail_backup_cleanup):
                 prepare_update(root, CANDIDATE, archive)
             self.assertEqual((root / "vendor/gstack/LICENSE").read_text(encoding="utf-8"), "new license")
+            self.assertIn("backup cleanup failed", errors.getvalue())
+            self.assertIn(".transaction-", errors.getvalue())
 
     def test_generation_failure_preserves_existing_repository_tree(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

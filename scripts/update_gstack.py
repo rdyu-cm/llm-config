@@ -160,43 +160,57 @@ def write_codex_metadata(path: Path, name: str) -> None:
     )
 
 
+def _adapt_codex_skill(source: str, name: str) -> str:
+    match = re.fullmatch(r"---\r?\n(.*?)\r?\n---\r?\n?(.*)", source, re.DOTALL)
+    if match is None:
+        raise ValueError(f"candidate skill is missing frontmatter: {name}")
+    frontmatter, body = match.groups()
+    lines = frontmatter.splitlines()
+    description_start = next(
+        (index for index, line in enumerate(lines) if re.match(r"^description\s*:", line)), None
+    )
+    if description_start is None:
+        raise ValueError(f"candidate skill is missing description: {name}")
+    description_end = description_start + 1
+    value = lines[description_start].split(":", 1)[1].strip()
+    if value in {"|", "|-", "|+", ">", ">-", ">+"}:
+        while description_end < len(lines) and (
+            not lines[description_end] or lines[description_end][0].isspace()
+        ):
+            description_end += 1
+    description = "\n".join(lines[description_start:description_end])
+    adapted = f"---\nname: {name}\n{description}\n---\n{body}"
+    for old, new in (
+        ("~/.claude/skills/gstack", "$GSTACK_ROOT"),
+        (".claude/skills/gstack", ".agents/skills/gstack"),
+        (".claude/skills/review", ".agents/skills/gstack/review"),
+        (".claude/skills", ".agents/skills"),
+    ):
+        adapted = adapted.replace(old, new)
+    return adapted
+
+
+def _candidate_skill_path(vendor: Path, name: str) -> Path:
+    relative = name if name == "gstack-upgrade" else name.removeprefix("gstack-")
+    return vendor / relative / "SKILL.md"
+
+
 def generate_codex_skills(root: Path, staged_vendor: Path, staged_generated: Path) -> None:
-    catalog = _load_catalog(root)
-    pinned_bun = str(catalog.get("bun", {}).get("version", ""))
-    bun = shutil.which("bun")
-    if bun is None:
-        raise RuntimeError(f"Bun {pinned_bun or '(pinned version)'} is required")
-    installed_bun = subprocess.check_output([bun, "--version"], text=True).strip()
-    if not pinned_bun or installed_bun != pinned_bun:
-        raise RuntimeError(f"Bun {pinned_bun} is required; found {installed_bun}")
-
-    env = dict(os.environ)
-    env["PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD"] = "1"
-    subprocess.run(
-        [bun, "install", "--frozen-lockfile", "--ignore-scripts"],
-        cwd=staged_vendor,
-        env=env,
-        check=True,
-    )
-    subprocess.run(
-        [bun, "run", "gen:skill-docs", "--host", "codex"],
-        cwd=staged_vendor,
-        env=env,
-        check=True,
-    )
-
-    generated = staged_vendor / ".agents" / "skills"
+    trusted_generated = root / "generated/gstack-codex"
     for name in sorted(_catalog_skill_names(root)):
-        source = generated / name
-        if not source.is_dir() or source.is_symlink():
-            raise ValueError(f"Bun generator did not produce {name}")
         destination = staged_generated / name
-        shutil.copytree(source, destination)
+        source = _candidate_skill_path(staged_vendor, name)
+        if source.is_file() and not source.is_symlink():
+            destination.mkdir()
+            adapted = _adapt_codex_skill(source.read_text(encoding="utf-8"), name)
+            (destination / "SKILL.md").write_text(adapted, encoding="utf-8")
+        else:
+            fallback = trusted_generated / name
+            if not fallback.is_dir() or fallback.is_symlink():
+                raise ValueError(f"candidate and trusted fallback are missing {name}")
+            shutil.copytree(fallback, destination)
+        (destination / "agents").mkdir(exist_ok=True)
         write_codex_metadata(destination / "agents/openai.yaml", name)
-
-    for generated_path in (staged_vendor / "node_modules", staged_vendor / ".agents"):
-        if generated_path.exists() or generated_path.is_symlink():
-            shutil.rmtree(generated_path)
 
 
 def replace_directory(staged: Path, target: Path) -> None:
@@ -337,7 +351,7 @@ def _install_update(root: Path, candidate: str, staged_vendor: Path, staged_gene
             try:
                 shutil.rmtree(backup)
             except OSError as error:
-                print(f"warning: update applied but backup cleanup failed: {error}", file=sys.stderr)
+                print(f"warning: update applied but backup cleanup failed for {backup}: {error}", file=sys.stderr)
 
 
 def prepare_update(root: Path, candidate: str, archive: Path) -> None:

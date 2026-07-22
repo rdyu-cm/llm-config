@@ -53,6 +53,34 @@ class GstackCatalogTests(unittest.TestCase):
             for name in expected_skills:
                 self.assertRegex(texts[name], rf"(?m)^{variable}=", name)
 
+    def test_workflow_skills_skip_optional_browser_setup_and_system_open(self) -> None:
+        generated = ROOT / "generated/gstack-codex"
+        office_hours = (generated / "gstack-office-hours/SKILL.md").read_text(encoding="utf-8")
+        plan_design = (generated / "gstack-plan-design-review/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+
+        for name, text in (
+            ("gstack-office-hours", office_hours),
+            ("gstack-plan-design-review", plan_design),
+        ):
+            for forbidden in (
+                "NEEDS_SETUP",
+                "cd <SKILL_DIR> && ./setup",
+                "bun.sh/install",
+                "Run the setup script to enable it.",
+                "open file://",
+            ):
+                self.assertNotIn(forbidden, text, name)
+        self.assertIn("skip browser preview and setup", office_hours)
+        self.assertIn("report the saved artifact path", office_hours)
+        self.assertIn('$B goto "file://$SKETCH_FILE"', office_hours)
+
+        self.assertIn("save the comparison board HTML", plan_design)
+        self.assertIn("report its artifact path", plan_design)
+        self.assertIn("continue the non-browser review flow", plan_design)
+        self.assertIn("BROWSE_READY: $B", plan_design)
+
     def test_workflow_catalog_excludes_browser_capabilities(self) -> None:
         with (ROOT / "gstack-capabilities.toml").open("rb") as handle:
             catalog = tomllib.load(handle)

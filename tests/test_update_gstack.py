@@ -242,6 +242,30 @@ class UpdateGstackTests(unittest.TestCase):
         self.assertIn('D="$GSTACK_DESIGN/design"', adapted)
         self.assertIn('P="$GSTACK_MAKE_PDF/pdf"', adapted)
 
+    def test_adapter_rewrites_workflow_browser_fallbacks(self) -> None:
+        from scripts.update_gstack import _adapt_codex_skill
+
+        office_hours = _adapt_codex_skill(
+            (ROOT / "vendor/gstack/office-hours/SKILL.md").read_text(encoding="utf-8"),
+            "gstack-office-hours",
+        )
+        plan_design = _adapt_codex_skill(
+            (ROOT / "vendor/gstack/plan-design-review/SKILL.md").read_text(encoding="utf-8"),
+            "gstack-plan-design-review",
+        )
+
+        self.assertNotIn("NEEDS_SETUP", office_hours)
+        self.assertNotIn("bun.sh/install", office_hours)
+        self.assertNotIn("Run the setup script to enable it.", office_hours)
+        self.assertIn("skip browser preview and setup", office_hours)
+        self.assertIn("report the saved artifact path", office_hours)
+        self.assertIn('$B goto "file://$SKETCH_FILE"', office_hours)
+
+        self.assertNotIn("open file://", plan_design)
+        self.assertIn("save the comparison board HTML", plan_design)
+        self.assertIn("report its artifact path", plan_design)
+        self.assertIn("continue the non-browser review flow", plan_design)
+
     def test_generation_never_executes_candidate_package_commands(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -365,6 +389,32 @@ class UpdateGstackTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "unresolved template"):
+                _validate_generated_tree(ROOT, generated)
+
+    def test_staged_validator_rejects_workflow_browser_setup_fallbacks(self) -> None:
+        from scripts.update_gstack import _validate_generated_tree
+
+        with tempfile.TemporaryDirectory() as directory:
+            generated = Path(directory) / "gstack-codex"
+            shutil.copytree(ROOT / "generated/gstack-codex", generated)
+            office_hours = generated / "gstack-office-hours/SKILL.md"
+            office_hours.write_text(
+                office_hours.read_text(encoding="utf-8") + "\nNEEDS_SETUP\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "browser setup fallback"):
+                _validate_generated_tree(ROOT, generated)
+
+            shutil.copy(
+                ROOT / "generated/gstack-codex/gstack-office-hours/SKILL.md",
+                office_hours,
+            )
+            plan_design = generated / "gstack-plan-design-review/SKILL.md"
+            plan_design.write_text(
+                plan_design.read_text(encoding="utf-8") + "\nopen file://artifact.html\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "system browser fallback"):
                 _validate_generated_tree(ROOT, generated)
 
     def test_replace_directory_restores_old_tree_when_install_rename_fails(self) -> None:

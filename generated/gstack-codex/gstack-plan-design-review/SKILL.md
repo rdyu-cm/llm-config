@@ -1053,7 +1053,7 @@ B=""
 if [ -x "$B" ]; then
   echo "BROWSE_READY: $B"
 else
-  echo "BROWSE_NOT_AVAILABLE (will use 'open' to view comparison boards)"
+  echo "BROWSE_NOT_AVAILABLE (comparison board will remain a saved artifact)"
 fi
 ```
 
@@ -1061,8 +1061,8 @@ If `DESIGN_NOT_AVAILABLE`: skip visual mockup generation and fall back to the
 existing HTML wireframe approach (`DESIGN_SKETCH`). Design mockups are a
 progressive enhancement, not a hard requirement.
 
-If `BROWSE_NOT_AVAILABLE`: use `open file://...` instead of `$B goto` to open
-comparison boards. The user just needs to see the HTML file in any browser.
+If `BROWSE_NOT_AVAILABLE`: save the comparison board HTML, report its artifact path,
+and continue the non-browser review flow. Do not invoke a system browser.
 
 If `DESIGN_READY`: the design binary is available for visual mockup generation.
 Commands:

@@ -792,7 +792,7 @@ Replace `SKILL_NAME`, `OUTCOME`, and `USED_BROWSE` before running.
 
 Skills that run plan reviews (`/plan-*-review`, `/codex review`) include the EXIT PLAN MODE GATE blocking checklist at the end of the skill, which verifies the plan file ends with `## GSTACK REVIEW REPORT` before ExitPlanMode is called. Skills that don't run plan reviews (operational skills like `/ship`, `/qa`, `/review`) typically don't operate in plan mode and have no review report to verify; this footer is a no-op for them. Writing the plan file is the one edit allowed in plan mode.
 
-## SETUP (run this check BEFORE any browse command)
+## OPTIONAL BROWSER RUNTIME (check before preview)
 
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -802,31 +802,13 @@ B=""
 if [ -x "$B" ]; then
   echo "READY: $B"
 else
-  echo "NEEDS_SETUP"
+  echo "BROWSE_NOT_AVAILABLE"
 fi
 ```
 
-If `NEEDS_SETUP`:
-1. Tell the user: "gstack browse needs a one-time build (~10 seconds). OK to proceed?" Then STOP and wait.
-2. Run: `cd <SKILL_DIR> && ./setup`
-3. If `bun` is not installed:
-   ```bash
-   if ! command -v bun >/dev/null 2>&1; then
-     BUN_VERSION="1.3.10"
-     BUN_INSTALL_SHA="bab8acfb046aac8c72407bdcce903957665d655d7acaa3e11c7c4616beae68dd"
-     tmpfile=$(mktemp)
-     curl -fsSL "https://bun.sh/install" -o "$tmpfile"
-     actual_sha=$(shasum -a 256 "$tmpfile" | awk '{print $1}')
-     if [ "$actual_sha" != "$BUN_INSTALL_SHA" ]; then
-       echo "ERROR: bun install script checksum mismatch" >&2
-       echo "  expected: $BUN_INSTALL_SHA" >&2
-       echo "  got:      $actual_sha" >&2
-       rm "$tmpfile"; exit 1
-     fi
-     BUN_VERSION="$BUN_VERSION" bash "$tmpfile"
-     rm "$tmpfile"
-   fi
-   ```
+If `BROWSE_NOT_AVAILABLE`: skip browser preview and setup. Do not install Bun,
+run setup, or recommend setup. Continue the text/artifact workflow and
+report the saved artifact path whenever a preview file is produced.
 
 # YC Office Hours
 
@@ -1384,8 +1366,8 @@ $B goto "file://$SKETCH_FILE"
 $B screenshot /tmp/gstack-sketch.png
 ```
 
-If `$B` is not available (browse binary not set up), skip the render step. Tell the
-user: "Visual sketch requires the browse binary. Run the setup script to enable it."
+If `$B` is not available, skip the render and screenshot step, report the saved
+artifact path in `SKETCH_FILE`, and continue the text/artifact workflow.
 
 **Step 4: Present and iterate**
 

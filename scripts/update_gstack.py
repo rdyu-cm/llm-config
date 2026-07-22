@@ -179,6 +179,45 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
                 raise ValueError(
                     f"generated gstack skill uses {variable} without initialization: {name}"
                 )
+        if name == "gstack-office-hours":
+            browser_setup_fallbacks = (
+                "NEEDS_SETUP",
+                "cd <SKILL_DIR> && ./setup",
+                "bun.sh/install",
+                "Run the setup script to enable it.",
+            )
+            if any(fallback in frontmatter for fallback in browser_setup_fallbacks):
+                raise ValueError(
+                    "generated gstack skill contains a browser setup fallback: "
+                    "gstack-office-hours"
+                )
+            for instruction in (
+                "skip browser preview and setup",
+                "report the saved artifact path",
+                '$B goto "file://$SKETCH_FILE"',
+            ):
+                if instruction not in frontmatter:
+                    raise ValueError(
+                        "generated gstack skill is missing its optional browser fallback: "
+                        "gstack-office-hours"
+                    )
+        if name == "gstack-plan-design-review":
+            if "open file://" in frontmatter:
+                raise ValueError(
+                    "generated gstack skill contains a system browser fallback: "
+                    "gstack-plan-design-review"
+                )
+            for instruction in (
+                "save the comparison board HTML",
+                "report its artifact path",
+                "continue the non-browser review flow",
+                "BROWSE_READY: $B",
+            ):
+                if instruction not in frontmatter:
+                    raise ValueError(
+                        "generated gstack skill is missing its optional browser fallback: "
+                        "gstack-plan-design-review"
+                    )
         trusted_skill = root / "generated/gstack-codex" / name / "SKILL.md"
         if trusted_skill.is_file() and not trusted_skill.is_symlink():
             trusted_text = trusted_skill.read_text(encoding="utf-8")
@@ -272,6 +311,46 @@ def _adapt_codex_skill(source: str, name: str) -> str:
         (".claude/skills", ".agents/skills"),
     ):
         adapted = adapted.replace(old, new)
+    return _apply_workflow_safe_fallbacks(adapted, name)
+
+
+def _apply_workflow_safe_fallbacks(adapted: str, name: str) -> str:
+    """Keep workflow-only profiles usable without installing browser tooling."""
+    if name == "gstack-office-hours":
+        adapted = adapted.replace(
+            "## SETUP (run this check BEFORE any browse command)",
+            "## OPTIONAL BROWSER RUNTIME (check before preview)",
+            1,
+        )
+        adapted = adapted.replace('  echo "NEEDS_SETUP"', '  echo "BROWSE_NOT_AVAILABLE"', 1)
+        adapted = re.sub(
+            r"(?ms)^If `NEEDS_SETUP`:\n.*?^   ```\n\n(?=# YC Office Hours)",
+            "If `BROWSE_NOT_AVAILABLE`: skip browser preview and setup. Do not install Bun,\n"
+            "run setup, or recommend setup. Continue the text/artifact workflow and\n"
+            "report the saved artifact path whenever a preview file is produced.\n\n",
+            adapted,
+            count=1,
+        )
+        adapted = adapted.replace(
+            "If `$B` is not available (browse binary not set up), skip the render step. Tell the\n"
+            'user: "Visual sketch requires the browse binary. Run the setup script to enable it."',
+            "If `$B` is not available, skip the render and screenshot step, report the saved\n"
+            "artifact path in `SKETCH_FILE`, and continue the text/artifact workflow.",
+            1,
+        )
+    elif name == "gstack-plan-design-review":
+        adapted = adapted.replace(
+            '  echo "BROWSE_NOT_AVAILABLE (will use \'open\' to view comparison boards)"',
+            '  echo "BROWSE_NOT_AVAILABLE (comparison board will remain a saved artifact)"',
+            1,
+        )
+        adapted = adapted.replace(
+            "If `BROWSE_NOT_AVAILABLE`: use `open file://...` instead of `$B goto` to open\n"
+            "comparison boards. The user just needs to see the HTML file in any browser.",
+            "If `BROWSE_NOT_AVAILABLE`: save the comparison board HTML, report its artifact path,\n"
+            "and continue the non-browser review flow. Do not invoke a system browser.",
+            1,
+        )
     return adapted
 
 

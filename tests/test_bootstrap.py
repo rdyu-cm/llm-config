@@ -38,6 +38,16 @@ class PortableSkillInventoryTests(unittest.TestCase):
 
 
 class BootstrapTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.previous_update_check = os.environ.get("CODEX_CONFIG_UPDATE_CHECK")
+        os.environ["CODEX_CONFIG_UPDATE_CHECK"] = "0"
+
+    def tearDown(self) -> None:
+        if self.previous_update_check is None:
+            os.environ.pop("CODEX_CONFIG_UPDATE_CHECK", None)
+        else:
+            os.environ["CODEX_CONFIG_UPDATE_CHECK"] = self.previous_update_check
+
     def test_gstack_flags_accept_unordered_permutations(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"

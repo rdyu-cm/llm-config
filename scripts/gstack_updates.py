@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 import tomllib
 from pathlib import Path
@@ -16,11 +17,13 @@ from pathlib import Path
 CACHE_VERSION = 1
 CACHE_MAX_AGE_SECONDS = 24 * 60 * 60
 HEAD_PATTERN = re.compile(r"[0-9a-f]{40}")
-CACHED_HEAD_PATTERN = re.compile(r"[0-9a-f]{12,40}")
 
 
 def cache_path() -> Path:
-    base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    configured = os.environ.get("XDG_CACHE_HOME")
+    base = Path(configured) if configured else Path.home() / ".cache"
+    if not base.is_absolute():
+        base = Path.home() / ".cache"
     return base / "codex-config" / "gstack-update.json"
 
 
@@ -37,20 +40,24 @@ def gstack_source(lock_path: Path) -> tuple[str, str]:
     return repository, pinned
 
 
-def cached_head(cache: Path) -> str | None:
+def cached_head(cache: Path, pinned: str) -> tuple[bool, str | None]:
     try:
         data = json.loads(cache.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return None
+        return False, None
     if not isinstance(data, dict):
-        return None
+        return False, None
+    if data.get("version") != CACHE_VERSION or data.get("pinned") != pinned:
+        return False, None
     checked_at = data.get("checked_at")
     head = data.get("head")
-    if not isinstance(checked_at, (int, float)) or not isinstance(head, str):
-        return None
-    if time.time() - checked_at > CACHE_MAX_AGE_SECONDS or not CACHED_HEAD_PATTERN.fullmatch(head):
-        return None
-    return head
+    if not isinstance(checked_at, (int, float)) or (head is not None and not isinstance(head, str)):
+        return False, None
+    if time.time() - checked_at > CACHE_MAX_AGE_SECONDS:
+        return False, None
+    if head is not None and not HEAD_PATTERN.fullmatch(head):
+        return False, None
+    return True, head
 
 
 def remote_gstack_head(repository: str) -> str | None:
@@ -65,19 +72,24 @@ def remote_gstack_head(repository: str) -> str | None:
     return head if HEAD_PATTERN.fullmatch(head) else None
 
 
-def write_cache(cache: Path, pinned: str, head: str) -> None:
+def write_cache(cache: Path, pinned: str, head: str | None) -> None:
     cache.parent.mkdir(parents=True, exist_ok=True)
-    temporary = cache.with_name(f".{cache.name}.tmp")
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        json.dump(
-            {"version": CACHE_VERSION, "checked_at": time.time(), "pinned": pinned, "head": head},
-            handle,
-        )
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(temporary, cache)
-    os.chmod(cache, 0o600)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=cache.parent, prefix=f".{cache.name}.", suffix=".tmp"
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(
+                {"version": CACHE_VERSION, "checked_at": time.time(), "pinned": pinned, "head": head},
+                handle,
+            )
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, cache)
+        os.chmod(cache, 0o600)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def notice(pinned: str, head: str) -> str | None:
@@ -90,13 +102,16 @@ def check_update(lock_path: Path, cache_path: Path, force: bool, remote_head: st
     """Return an informational update notice, without surfacing lookup or cache failures."""
     try:
         repository, pinned = gstack_source(lock_path)
-        head = None if force else cached_head(cache_path)
-        if head is None:
-            head = remote_head if remote_head is not None else remote_gstack_head(repository)
+        cached, head = (False, None) if force else cached_head(cache_path, pinned)
+        if not cached:
+            try:
+                head = remote_head if remote_head is not None else remote_gstack_head(repository)
+            except (OSError, subprocess.SubprocessError):
+                head = None
             if not isinstance(head, str) or not HEAD_PATTERN.fullmatch(head):
-                return None
+                head = None
             write_cache(cache_path, pinned, head)
-        return notice(pinned, head)
+        return notice(pinned, head) if head is not None else None
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
 

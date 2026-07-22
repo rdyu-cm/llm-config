@@ -114,12 +114,25 @@ def validate_gstack_catalog(root: Path) -> int:
 
     full = set(lists["full"])
     generated = {
-        path.parent.name
-        for path in (root / "generated" / "gstack-codex").glob("gstack-*/SKILL.md")
+        path.name
+        for path in (root / "generated" / "gstack-codex").glob("gstack-*")
+        if path.is_dir()
     }
-    unlisted = sorted(generated - full - {"gstack-upgrade"})
+    expected_generated = full | {"gstack-upgrade"}
+    missing_generated = sorted(expected_generated - generated)
+    if missing_generated:
+        fail(f"missing generated gstack skill: {', '.join(missing_generated)}")
+    unlisted = sorted(generated - expected_generated)
     if unlisted:
         fail(f"generated gstack skills missing from full profile: {', '.join(unlisted)}")
+    for name in sorted(generated):
+        path = root / "generated" / "gstack-codex" / name / "SKILL.md"
+        if not path.is_file():
+            fail(f"missing generated gstack skill: {name}")
+        metadata = parse_frontmatter(path)
+        if metadata["name"] != name:
+            fail(f"generated gstack skill name does not match catalog: {name}")
+
     sidecars = sorted((root / "generated" / "gstack-codex").glob("gstack-*/agents/openai.yaml"))
     sidecar_names = {path.parents[1].name for path in sidecars}
     missing_sidecars = sorted(generated - sidecar_names)

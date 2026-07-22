@@ -51,6 +51,19 @@ class GstackCatalogTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "gstack-upgrade"):
                 validate_gstack_catalog(temporary_root)
 
+    def test_catalog_requires_upgrade_frontmatter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            temporary_root = Path(directory)
+            shutil.copy(ROOT / "gstack-capabilities.toml", temporary_root / "gstack-capabilities.toml")
+            skills = temporary_root / "generated" / "gstack-codex"
+            skills.mkdir(parents=True)
+            for source in (ROOT / "generated" / "gstack-codex").glob("gstack-*"):
+                if source.name != "gstack-upgrade":
+                    (skills / source.name).symlink_to(source, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "missing generated gstack skill: gstack-upgrade"):
+                validate_gstack_catalog(temporary_root)
+
+
 
     def test_every_catalog_skill_has_generated_codex_frontmatter(self) -> None:
         with (ROOT / "gstack-capabilities.toml").open("rb") as handle:

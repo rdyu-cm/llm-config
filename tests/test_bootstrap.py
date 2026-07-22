@@ -280,5 +280,33 @@ class BootstrapTests(unittest.TestCase):
             self.assertFalse((home / ".codex" / "AGENTS.md").exists())
 
 
+    def test_apply_gstack_conflict_stops_before_bootstrap_mutations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            fake_bin = Path(directory) / "bin"
+            home.mkdir()
+            (home / ".codex/skills/gstack-office-hours").mkdir(parents=True)
+            fake_bin.mkdir()
+            npx = fake_bin / "npx"
+            npx.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            npx.chmod(0o755)
+
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/bootstrap.sh"), "--apply", "--gstack=workflow"],
+                env={
+                    **os.environ,
+                    "CODEX_CONFIG_UPDATE_CHECK": "0",
+                    "HOME": str(home),
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                    "PYTHON": sys.executable,
+                },
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse((home / ".codex/config.toml").exists())
+            self.assertFalse((home / ".agents/skills").exists())
+
 if __name__ == "__main__":
     unittest.main()

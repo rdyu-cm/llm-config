@@ -165,8 +165,11 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     try:
-        for message in install(args.root.resolve(), Path.home(), args.mode, args.apply):
+        messages = install(args.root.resolve(), Path.home(), args.mode, args.apply)
+        for message in messages:
             print(message)
+        if args.apply and any(message.startswith("conflict:") for message in messages):
+            return 1
     except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
         print(f"gstack install failed: {error}", file=sys.stderr)
         return 1

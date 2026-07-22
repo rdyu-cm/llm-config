@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr
@@ -141,6 +144,44 @@ class InstallGstackTests(unittest.TestCase):
             self.assertFalse(temporary.exists())
             install(ROOT, home, "workflow", True)
             self.assertTrue((home / ".codex/gstack-managed.json").is_file())
+
+    def test_cli_apply_conflicts_fail_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            for conflict in ("link", "state", "parent"):
+                with self.subTest(conflict=conflict):
+                    if conflict == "link":
+                        (home / ".codex/skills/gstack-office-hours").mkdir(parents=True)
+                    elif conflict == "state":
+                        state = home / ".codex/gstack-managed.json"
+                        state.parent.mkdir(parents=True, exist_ok=True)
+                        state.symlink_to(home / "missing-state")
+                    else:
+                        skills = home / ".codex/skills"
+                        skills.mkdir(parents=True, exist_ok=True)
+                        (skills / "gstack").symlink_to(home / "external", target_is_directory=True)
+
+                    result = subprocess.run(
+                        [sys.executable, str(ROOT / "scripts/install_gstack.py"), "--root", str(ROOT), "--mode", "workflow", "--apply"],
+                        env={**os.environ, "HOME": str(home)},
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertFalse((home / ".codex/gstack-managed.json").is_file())
+
+    def test_cli_dry_run_conflict_remains_successful(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            (home / ".codex/skills/gstack-office-hours").mkdir(parents=True)
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/install_gstack.py"), "--root", str(ROOT), "--mode", "workflow"],
+                env={**os.environ, "HOME": str(home)},
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 if __name__ == "__main__":
     unittest.main()

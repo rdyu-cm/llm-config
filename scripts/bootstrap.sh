@@ -158,6 +158,12 @@ else
   "$PYTHON" "$ROOT/scripts/prepare_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE"
 fi
 
+if [ "$APPLY" = true ]; then
+  "$PYTHON" "$ROOT/scripts/install_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE" --apply
+else
+  "$PYTHON" "$ROOT/scripts/install_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE"
+fi
+
 if ! install_config; then
   echo "Config installation failed; no discovery links were changed." >&2
   exit 1
@@ -182,10 +188,7 @@ if [ "$conflicts" -ne 0 ]; then
   exit 1
 fi
 
-if [ "$APPLY" = true ]; then
-  "$PYTHON" "$ROOT/scripts/install_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE" --apply
-else
-  "$PYTHON" "$ROOT/scripts/install_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE"
+if [ "$APPLY" = false ]; then
   echo "Dry-run only. Re-run with --apply after resolving any conflicts."
 fi
 

@@ -137,6 +137,18 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
         frontmatter = skill.read_text(encoding="utf-8")
         if re.match(rf"\A---\n(?:(?!\n---\n).)*^name:\s*{re.escape(name)}\s*$", frontmatter, re.MULTILINE | re.DOTALL) is None:
             raise ValueError(f"generated gstack skill name does not match: {name}")
+        if re.search(r"(?:~?/)?\.claude/skills", frontmatter):
+            raise ValueError(f"generated gstack skill contains a Claude path: {name}")
+        trusted_skill = root / "generated/gstack-codex" / name / "SKILL.md"
+        if trusted_skill.is_file() and not trusted_skill.is_symlink():
+            trusted_text = trusted_skill.read_text(encoding="utf-8")
+            for initialization in ("GSTACK_ROOT=", "GSTACK_BIN="):
+                if initialization in trusted_text and initialization not in frontmatter:
+                    raise ValueError(
+                        f"generated gstack skill is missing {initialization.rstrip('=')}: {name}"
+                    )
+        if "{{" in frontmatter or "}}" in frontmatter:
+            raise ValueError(f"generated gstack skill contains an unresolved template: {name}")
         metadata_text = metadata.read_text(encoding="utf-8")
         expected_metadata = (
             f'interface:\n  display_name: "{name}"\n'
@@ -178,7 +190,35 @@ def _adapt_codex_skill(source: str, name: str) -> str:
             not lines[description_end] or lines[description_end][0].isspace()
         ):
             description_end += 1
-    description = "\n".join(lines[description_start:description_end])
+        description_text = "\n".join(
+            line[2:] if line.startswith("  ") else line
+            for line in lines[description_start + 1 : description_end]
+        ).strip()
+    else:
+        description_text = value.strip('"\'')
+    discovery = re.search(
+        r"(?m)^## When to invoke this skill\s*\n+(.*?)(?=^## |\Z)", body, re.DOTALL
+    )
+    if discovery is not None:
+        routing = discovery.group(1).strip()
+        suffix = " (gstack)"
+        if description_text.endswith(suffix):
+            description_text = description_text[: -len(suffix)]
+        description_text = f"{description_text} {routing}{suffix}".strip()
+        body = body[: discovery.start()] + body[discovery.end() :]
+    description = "description: |\n" + "\n".join(f"  {line}" for line in description_text.splitlines())
+    preamble = "## Preamble (run first)\n\n```bash\n"
+    initialization = (
+        "_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)\n"
+        'GSTACK_ROOT="$HOME/.codex/skills/gstack"\n'
+        '[ -n "$_ROOT" ] && [ -d "$_ROOT/.agents/skills/gstack" ] && '
+        'GSTACK_ROOT="$_ROOT/.agents/skills/gstack"\n'
+        'GSTACK_BIN="$GSTACK_ROOT/bin"\n'
+        'GSTACK_BROWSE="$GSTACK_ROOT/browse/dist"\n'
+        'GSTACK_DESIGN="$GSTACK_ROOT/design/dist"\n'
+    )
+    if preamble in body and "GSTACK_ROOT=" not in body:
+        body = body.replace(preamble, preamble + initialization, 1)
     adapted = f"---\nname: {name}\n{description}\n---\n{body}"
     for old, new in (
         ("~/.claude/skills/gstack", "$GSTACK_ROOT"),
@@ -190,6 +230,26 @@ def _adapt_codex_skill(source: str, name: str) -> str:
     return adapted
 
 
+def _suppress_trusted_codex_sections(
+    candidate: str, trusted_source: str, trusted_generated: str
+) -> str:
+    """Remove only source sections intentionally omitted by the trusted adapter."""
+    trusted_headings = re.findall(r"(?m)^## [^\n]+$", trusted_source)
+    omitted_headings = [
+        heading
+        for heading in trusted_headings
+        if re.search(rf"(?m)^{re.escape(heading)}$", trusted_generated) is None
+    ]
+    for heading in omitted_headings:
+        candidate = re.sub(
+            rf"(?ms)^{re.escape(heading)}\n.*?(?=^## |\Z)",
+            "",
+            candidate,
+            count=1,
+        )
+    return candidate
+
+
 def _candidate_skill_path(vendor: Path, name: str) -> Path:
     relative = name if name == "gstack-upgrade" else name.removeprefix("gstack-")
     return vendor / relative / "SKILL.md"
@@ -197,18 +257,41 @@ def _candidate_skill_path(vendor: Path, name: str) -> Path:
 
 def generate_codex_skills(root: Path, staged_vendor: Path, staged_generated: Path) -> None:
     trusted_generated = root / "generated/gstack-codex"
+    trusted_vendor = root / "vendor/gstack"
     for name in sorted(_catalog_skill_names(root)):
         destination = staged_generated / name
         source = _candidate_skill_path(staged_vendor, name)
-        if source.is_file() and not source.is_symlink():
-            destination.mkdir()
-            adapted = _adapt_codex_skill(source.read_text(encoding="utf-8"), name)
-            (destination / "SKILL.md").write_text(adapted, encoding="utf-8")
-        else:
-            fallback = trusted_generated / name
+        trusted_source = _candidate_skill_path(trusted_vendor, name)
+        fallback = trusted_generated / name
+        source_matches_trusted = (
+            source.is_file()
+            and not source.is_symlink()
+            and trusted_source.is_file()
+            and not trusted_source.is_symlink()
+            and source.read_bytes() == trusted_source.read_bytes()
+        )
+        if source_matches_trusted or not source.is_file():
             if not fallback.is_dir() or fallback.is_symlink():
                 raise ValueError(f"candidate and trusted fallback are missing {name}")
             shutil.copytree(fallback, destination)
+        elif not source.is_symlink():
+            destination.mkdir()
+            adapted = _adapt_codex_skill(source.read_text(encoding="utf-8"), name)
+            trusted_skill = fallback / "SKILL.md"
+            if (
+                trusted_source.is_file()
+                and not trusted_source.is_symlink()
+                and trusted_skill.is_file()
+                and not trusted_skill.is_symlink()
+            ):
+                adapted = _suppress_trusted_codex_sections(
+                    adapted,
+                    _adapt_codex_skill(trusted_source.read_text(encoding="utf-8"), name),
+                    trusted_skill.read_text(encoding="utf-8"),
+                )
+            (destination / "SKILL.md").write_text(adapted, encoding="utf-8")
+        else:
+            raise ValueError(f"candidate skill is unsafe: {name}")
         (destination / "agents").mkdir(exist_ok=True)
         write_codex_metadata(destination / "agents/openai.yaml", name)
 

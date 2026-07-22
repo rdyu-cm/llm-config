@@ -18,6 +18,7 @@ from scripts.update_gstack import (
     write_codex_metadata,
 )
 
+ROOT = Path(__file__).resolve().parents[1]
 
 CANDIDATE = "0123456789abcdef0123456789abcdef01234567"
 
@@ -129,6 +130,53 @@ class UpdateGstackTests(unittest.TestCase):
                     prepare_update(root, CANDIDATE, archive)
             self.assertFalse((root / "vendor").exists())
             self.assertFalse((root / "generated").exists())
+    def test_trusted_adapter_matches_current_generated_tree_byte_for_byte(self) -> None:
+        from scripts.update_gstack import generate_codex_skills
+
+        with tempfile.TemporaryDirectory() as directory:
+            generated = Path(directory) / "gstack-codex"
+            generated.mkdir()
+            generate_codex_skills(ROOT, ROOT / "vendor/gstack", generated)
+            expected = ROOT / "generated/gstack-codex"
+            actual_files = sorted(
+                path.relative_to(generated) for path in generated.rglob("*") if path.is_file()
+            )
+            expected_files = sorted(
+                path.relative_to(expected) for path in expected.rglob("*") if path.is_file()
+            )
+            self.assertEqual(len(actual_files), 106)
+            self.assertEqual(actual_files, expected_files)
+            for relative in expected_files:
+                self.assertEqual((generated / relative).read_bytes(), (expected / relative).read_bytes(), relative)
+
+
+    def test_changed_candidate_skill_keeps_codex_adapter_invariants(self) -> None:
+        from scripts.update_gstack import generate_codex_skills
+
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            candidate = temporary / "candidate"
+            generated = temporary / "generated"
+            (candidate / "review").mkdir(parents=True)
+            generated.mkdir()
+            source = (ROOT / "vendor/gstack/review/SKILL.md").read_text(encoding="utf-8")
+            source = source.replace(
+                "Pre-landing PR review. (gstack)",
+                "Pre-landing PR review with candidate fidelity. (gstack)",
+                1,
+            )
+            (candidate / "review/SKILL.md").write_text(source, encoding="utf-8")
+
+            generate_codex_skills(ROOT, candidate, generated)
+
+            adapted = (generated / "gstack-review/SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("candidate fidelity", adapted)
+            self.assertIn("Analyzes diff against the base branch", adapted.split("---", 2)[1])
+            self.assertIn('GSTACK_ROOT="$HOME/.codex/skills/gstack"', adapted)
+            self.assertIn('GSTACK_BIN="$GSTACK_ROOT/bin"', adapted)
+            self.assertNotIn(".claude/skills", adapted)
+            self.assertNotIn("Review Army — Specialist Dispatch", adapted)
+            self.assertNotIn("Adversarial review (always-on)", adapted)
 
     def test_generation_never_executes_candidate_package_commands(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -192,6 +240,31 @@ class UpdateGstackTests(unittest.TestCase):
                 'policy:\n'
                 '  allow_implicit_invocation: true\n',
             )
+
+    def test_staged_validator_rejects_claude_paths_and_missing_initialization(self) -> None:
+        from scripts.update_gstack import _validate_generated_tree
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staged = root / "staged"
+            (root / "generated/gstack-codex/gstack-test").mkdir(parents=True)
+            (root / "gstack-capabilities.toml").write_text(
+                'version = 1\n[profiles.full]\nskills = ["gstack-test"]\n', encoding="utf-8"
+            )
+            (root / "generated/gstack-codex/gstack-test/SKILL.md").write_text(
+                "GSTACK_ROOT=x\nGSTACK_BIN=x\n", encoding="utf-8"
+            )
+            self._write_generated_fixture(root, root / "vendor", staged)
+            skill = staged / "gstack-test/SKILL.md"
+            skill.write_text(skill.read_text(encoding="utf-8") + ".claude/skills/bad\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "Claude path"):
+                _validate_generated_tree(root, staged)
+
+            skill.write_text(
+                "---\nname: gstack-test\ndescription: test\n---\nbody\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "GSTACK_ROOT"):
+                _validate_generated_tree(root, staged)
 
     def test_replace_directory_restores_old_tree_when_install_rename_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

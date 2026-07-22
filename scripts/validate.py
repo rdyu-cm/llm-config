@@ -49,6 +49,27 @@ def parse_frontmatter(path: Path) -> dict[str, str]:
     return values
 
 
+def validate_gstack_vendor(root: Path, lock: dict) -> None:
+    source = next((item for item in lock.get("sources", []) if item.get("name") == "gstack"), None)
+    if source is None:
+        fail("sources.lock.toml is missing gstack")
+    vendor = root / "vendor" / "gstack"
+    required = ("LICENSE", "setup", "package.json", "hosts/codex.ts")
+    for relative in required:
+        if not (vendor / relative).is_file():
+            fail(f"vendor/gstack is missing {relative}")
+    if (vendor / ".git").exists():
+        fail("vendor/gstack must not contain nested Git metadata")
+    license_text = (vendor / "LICENSE").read_text(encoding="utf-8")
+    if "MIT License" not in license_text or "Copyright (c) 2026 Garry Tan" not in license_text:
+        fail("vendor/gstack/LICENSE is not the expected upstream MIT license")
+    metadata = load_toml(root / "vendor" / "gstack-source.toml")
+    if metadata.get("repository") != source.get("repository"):
+        fail("gstack repository metadata does not match sources.lock.toml")
+    if metadata.get("commit") != source.get("commit"):
+        fail("gstack commit metadata does not match sources.lock.toml")
+
+
 def main() -> int:
     config = load_toml(ROOT / ".codex" / "config.toml")
     if config.get("sandbox_mode") != "workspace-write":
@@ -56,7 +77,8 @@ def main() -> int:
 
     for path in sorted((ROOT / "profiles").glob("*.config.toml")):
         load_toml(path)
-    load_toml(ROOT / "sources.lock.toml")
+    sources = load_toml(ROOT / "sources.lock.toml")
+    validate_gstack_vendor(ROOT, sources)
     load_toml(ROOT / "plugins.lock.toml")
 
     with (ROOT / ".codex" / "hooks.json").open(encoding="utf-8") as handle:

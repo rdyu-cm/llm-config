@@ -45,6 +45,8 @@ def prepare(root: Path, mode: str, apply: bool, env: dict[str, str]) -> list[str
         raise ValueError(f"invalid gstack mode: {mode}")
     if mode == "off":
         return []
+    if mode == "workflow":
+        return [f"ready   gstack {mode}"] if apply else [f"would   prepare gstack {mode}"]
 
     catalog = load_catalog(root)
     bun = find_bun(env)

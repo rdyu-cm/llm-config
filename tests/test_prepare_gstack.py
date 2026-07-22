@@ -14,15 +14,14 @@ class PrepareGstackTests(unittest.TestCase):
     def test_off_does_not_require_bun(self) -> None:
         self.assertEqual(prepare(ROOT, "off", True, {"PATH": ""}), [])
 
-    def test_workflow_sets_browser_download_skip(self) -> None:
-        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+    def test_workflow_apply_requires_no_bun_or_subprocess(self) -> None:
+        with patch("scripts.prepare_gstack.find_bun") as find_bun, \
+             patch("scripts.prepare_gstack.download_installer") as download, \
              patch("scripts.prepare_gstack.subprocess.run") as run:
-            prepare(ROOT, "workflow", True, {"PATH": "/fake"})
-        install_call = run.call_args_list[0]
-        self.assertEqual(install_call.args[0][-2:], ["install", "--frozen-lockfile"])
-        self.assertEqual(install_call.kwargs["env"]["PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD"], "1")
-        self.assertFalse(any("build" in call.args[0] for call in run.call_args_list))
-        self.assertFalse(any("playwright" in call.args[0] for call in run.call_args_list))
+            self.assertEqual(prepare(ROOT, "workflow", True, {"PATH": ""}), ["ready   gstack workflow"])
+        find_bun.assert_not_called()
+        download.assert_not_called()
+        run.assert_not_called()
 
     def test_checksum_mismatch_stops_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory, \
@@ -31,7 +30,7 @@ class PrepareGstackTests(unittest.TestCase):
             installer = Path(directory) / "bun-install"
             installer.write_text("unexpected", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "checksum"):
-                prepare(ROOT, "workflow", True, {"PATH": ""})
+                prepare(ROOT, "full", True, {"PATH": ""})
 
     def test_verified_installer_runs_before_frozen_install(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -43,8 +42,8 @@ class PrepareGstackTests(unittest.TestCase):
                  patch("scripts.prepare_gstack.verify_sha256", side_effect=lambda *_: events.append("verify")), \
                  patch("scripts.prepare_gstack.run_bun_installer", side_effect=lambda *_: events.append("installer")), \
                  patch("scripts.prepare_gstack.subprocess.run", side_effect=lambda *_args, **_kwargs: events.append("install")):
-                prepare(ROOT, "workflow", True, {"PATH": "", "HOME": directory})
-            self.assertEqual(events, ["verify", "installer", "install"])
+                prepare(ROOT, "full", True, {"PATH": "", "HOME": directory})
+            self.assertEqual(events[:3], ["verify", "installer", "install"])
 
     def test_full_installs_before_build(self) -> None:
         with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
@@ -83,7 +82,7 @@ class PrepareGstackTests(unittest.TestCase):
             with patch("scripts.prepare_gstack.find_bun", return_value=None), \
                  patch("scripts.prepare_gstack.download_installer", return_value=installer):
                 with self.assertRaisesRegex(ValueError, "checksum"):
-                    prepare(ROOT, "workflow", True, {"PATH": ""})
+                    prepare(ROOT, "full", True, {"PATH": ""})
             self.assertFalse(installer.exists())
 
     def test_installer_is_removed_after_execution_failure(self) -> None:
@@ -95,7 +94,7 @@ class PrepareGstackTests(unittest.TestCase):
                  patch("scripts.prepare_gstack.verify_sha256"), \
                  patch("scripts.prepare_gstack.run_bun_installer", side_effect=RuntimeError("install failed")):
                 with self.assertRaisesRegex(RuntimeError, "install failed"):
-                    prepare(ROOT, "workflow", True, {"PATH": ""})
+                    prepare(ROOT, "full", True, {"PATH": ""})
             self.assertFalse(installer.exists())
 
     def test_bun_rediscovery_uses_supplied_home(self) -> None:
@@ -109,7 +108,7 @@ class PrepareGstackTests(unittest.TestCase):
              patch("scripts.prepare_gstack.verify_sha256"), \
              patch("scripts.prepare_gstack.run_bun_installer"), \
              patch("scripts.prepare_gstack.subprocess.run"):
-            prepare(ROOT, "workflow", True, {"PATH": "/original", "HOME": directory})
+            prepare(ROOT, "full", True, {"PATH": "/original", "HOME": directory})
         self.assertTrue(observed_paths[1].startswith(f"{Path(directory) / '.bun/bin'}{os.pathsep}"))
 if __name__ == "__main__":
     unittest.main()

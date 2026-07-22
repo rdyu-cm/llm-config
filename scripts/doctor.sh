@@ -129,6 +129,8 @@ if mode != "off":
         expected.update({
             runtime / "browse": root / "vendor" / "gstack" / "browse",
             runtime / "qa": root / "vendor" / "gstack" / "qa",
+            runtime / "design": root / "vendor" / "gstack" / "design",
+            runtime / "make-pdf": root / "vendor" / "gstack" / "make-pdf",
         })
 mismatches = []
 if set(links) != {str(target) for target in expected}:

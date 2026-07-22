@@ -278,6 +278,7 @@ class BootstrapTests(unittest.TestCase):
             self.assertFalse((home / ".codex" / "config.local.toml").exists())
             self.assertFalse((fixture / ".codex" / "config.generated.toml").exists())
             self.assertFalse((home / ".codex" / "AGENTS.md").exists())
+            self.assertFalse((home / ".codex" / "gstack-managed.json").exists())
 
 
     def test_apply_gstack_conflict_stops_before_bootstrap_mutations(self) -> None:
@@ -305,8 +306,35 @@ class BootstrapTests(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertFalse((home / ".codex/config.toml").exists())
-            self.assertFalse((home / ".agents/skills").exists())
+            self.assertTrue((home / ".codex/config.toml").exists())
+            self.assertTrue((home / ".agents/skills").exists())
+
+    def test_prewarm_failure_leaves_gstack_uninstalled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            fake_bin = Path(directory) / "bin"
+            home.mkdir()
+            fake_bin.mkdir()
+            npx = fake_bin / "npx"
+            npx.write_text("#!/usr/bin/env bash\nexit 73\n", encoding="utf-8")
+            npx.chmod(0o755)
+
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/bootstrap.sh"), "--apply", "--gstack=off"],
+                env={
+                    **os.environ,
+                    "CODEX_CONFIG_UPDATE_CHECK": "0",
+                    "HOME": str(home),
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                    "PYTHON": sys.executable,
+                },
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse((home / ".codex/gstack-managed.json").exists())
+            self.assertFalse((home / ".codex/skills/gstack-office-hours").exists())
 
 if __name__ == "__main__":
     unittest.main()

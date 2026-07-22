@@ -29,6 +29,8 @@ def desired_links(root: Path, home: Path, mode: str) -> dict[Path, Path]:
     if mode == "full":
         links[runtime / "browse"] = root / "vendor" / "gstack" / "browse"
         links[runtime / "qa"] = root / "vendor" / "gstack" / "qa"
+        links[runtime / "design"] = root / "vendor" / "gstack" / "design"
+        links[runtime / "make-pdf"] = root / "vendor" / "gstack" / "make-pdf"
     return links
 
 

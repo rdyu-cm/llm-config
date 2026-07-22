@@ -33,8 +33,12 @@ class InstallGstackTests(unittest.TestCase):
             unrelated.mkdir(parents=True)
             install(ROOT, home, "full", True)
             self.assertTrue((home / ".codex/skills/gstack-browse").exists())
+            self.assertTrue((home / ".codex/skills/gstack/design").exists())
+            self.assertTrue((home / ".codex/skills/gstack/make-pdf").exists())
             install(ROOT, home, "workflow", True)
             self.assertFalse((home / ".codex/skills/gstack-browse").exists())
+            self.assertFalse((home / ".codex/skills/gstack/design").exists())
+            self.assertFalse((home / ".codex/skills/gstack/make-pdf").exists())
             self.assertTrue(unrelated.is_dir())
 
     def test_dry_run_and_conflicts_do_not_mutate_home(self) -> None:

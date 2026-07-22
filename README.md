@@ -163,3 +163,7 @@ The update check compares every pinned commit with upstream `HEAD` and exits non
 Keep credentials in environment variables or a local ignored `.env`. Do not add Codex authentication state, transcripts, MCP OAuth data, Codebase Memory indexes, caches, browser output, or local overrides to this repository.
 
 Machine-specific model choices, project trust entries, and TUI state belong in `~/.codex/config.local.toml`. Codex-owned hook trust hashes remain in the ignored generated config and are preserved when it is regenerated. Re-run `./scripts/bootstrap.sh --apply` after pulling portable config changes; it regenerates the ignored merged config. Portable values win when both layers define the same key.
+
+## License
+
+Original content in this repository is licensed under the [MIT License](LICENSE). Bundled third-party components remain subject to their accompanying license and notice files.

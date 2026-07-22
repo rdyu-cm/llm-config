@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-office-hours"
-  short_description: "YC Office Hours — two modes. Startup mode: six forcing questions that expose demand reality, status quo, desperate..."
-  default_prompt: "Use gstack-office-hours for this task."
+  short_description: "Use the $gstack-office-hours workflow."
+  default_prompt: "Invoke $gstack-office-hours for this task."
 policy:
   allow_implicit_invocation: true

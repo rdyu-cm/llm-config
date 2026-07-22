@@ -1,4 +1,8 @@
 import tomllib
+import shutil
+import tempfile
+from scripts.validate import parse_gstack_openai_metadata, validate_gstack_catalog
+
 import unittest
 from pathlib import Path
 
@@ -22,6 +26,31 @@ class GstackCatalogTests(unittest.TestCase):
         self.assertTrue({"gstack-office-hours", "gstack-plan-eng-review", "gstack-review", "gstack-ship"} <= workflow)
         self.assertFalse(workflow & BROWSER_SKILLS)
         self.assertNotIn("gstack-upgrade", workflow)
+    def test_every_generated_sidecar_meets_codex_metadata_contract(self) -> None:
+        sidecars = sorted((ROOT / "generated" / "gstack-codex").glob("gstack-*/agents/openai.yaml"))
+        self.assertEqual(len(sidecars), 53)
+        for path in sidecars:
+            name = path.parents[1].name
+            metadata = parse_gstack_openai_metadata(path)
+            self.assertEqual(metadata["interface"]["display_name"], name)
+            self.assertGreaterEqual(len(metadata["interface"]["short_description"]), 25)
+            self.assertLessEqual(len(metadata["interface"]["short_description"]), 64)
+            self.assertIn(f"${name}", metadata["interface"]["default_prompt"])
+
+    def test_catalog_rejects_gstack_upgrade_in_full_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            temporary_root = Path(directory)
+            shutil.copy(ROOT / "gstack-capabilities.toml", temporary_root / "gstack-capabilities.toml")
+            (temporary_root / "generated").mkdir()
+            (temporary_root / "generated" / "gstack-codex").symlink_to(
+                ROOT / "generated" / "gstack-codex", target_is_directory=True
+            )
+            catalog = (temporary_root / "gstack-capabilities.toml").read_text(encoding="utf-8")
+            catalog = catalog.rsplit('  "gstack-unfreeze",\n]', 1)[0] + '  "gstack-unfreeze",\n  "gstack-upgrade",\n]\n'
+            (temporary_root / "gstack-capabilities.toml").write_text(catalog, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "gstack-upgrade"):
+                validate_gstack_catalog(temporary_root)
+
 
     def test_every_catalog_skill_has_generated_codex_frontmatter(self) -> None:
         with (ROOT / "gstack-capabilities.toml").open("rb") as handle:

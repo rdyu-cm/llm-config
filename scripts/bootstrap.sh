@@ -188,3 +188,7 @@ else
   "$PYTHON" "$ROOT/scripts/install_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE"
   echo "Dry-run only. Re-run with --apply after resolving any conflicts."
 fi
+
+if [ "${CODEX_CONFIG_UPDATE_CHECK:-1}" != "0" ]; then
+  "$PYTHON" "$ROOT/scripts/gstack_updates.py" --notify --force || true
+fi

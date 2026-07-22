@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,7 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 HOOKS = ROOT / ".codex" / "hooks"
 
 
-def run_hook(name: str, command: str, tool_name: str = "Bash") -> dict | None:
+def run_hook(
+    name: str, command: str, tool_name: str = "Bash", environment: dict[str, str] | None = None
+) -> dict | None:
     payload = {"tool_name": tool_name, "tool_input": {"command": command}}
     result = subprocess.run(
         [sys.executable, str(HOOKS / name)],
@@ -22,6 +26,7 @@ def run_hook(name: str, command: str, tool_name: str = "Bash") -> dict | None:
         text=True,
         capture_output=True,
         check=True,
+        env={**os.environ, **(environment or {})},
     )
     return json.loads(result.stdout) if result.stdout.strip() else None
 
@@ -56,6 +61,31 @@ class SecretGuardTests(unittest.TestCase):
 
 
 class SessionContextTests(unittest.TestCase):
+    def test_includes_changed_gstack_update_notice(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = run_hook(
+                "session_context.py",
+                "",
+                environment={
+                    "GSTACK_REMOTE_HEAD": "84be2f97c4190000000000000000000000000000",
+                    "XDG_CACHE_HOME": directory,
+                },
+            )
+
+        self.assertIn("update  gstack:", output["hookSpecificOutput"]["additionalContext"])
+
+    def test_omits_gstack_update_notice_when_opted_out(self) -> None:
+        output = run_hook(
+            "session_context.py",
+            "",
+            environment={
+                "CODEX_CONFIG_UPDATE_CHECK": "0",
+                "GSTACK_REMOTE_HEAD": "84be2f97c4190000000000000000000000000000",
+            },
+        )
+
+        self.assertNotIn("update  gstack:", output["hookSpecificOutput"]["additionalContext"])
+
     def test_describes_codebase_memory_without_profile_specific_inference(self) -> None:
         output = run_hook("session_context.py", "")
         context = output["hookSpecificOutput"]["additionalContext"]
@@ -70,4 +100,3 @@ class SessionContextTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

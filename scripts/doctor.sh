@@ -79,22 +79,24 @@ else
 fi
 
 GSTACK_STATE="$HOME/.codex/gstack-managed.json"
-if [ -e "$GSTACK_STATE" ]; then
+if [ -e "$GSTACK_STATE" ] || [ -L "$GSTACK_STATE" ]; then
   if [ -L "$GSTACK_STATE" ] || [ ! -f "$GSTACK_STATE" ]; then
     echo "gstack managed state invalid" >&2
     failures=$((failures + 1))
   elif [ -z "$PYTHON" ]; then
     echo "gstack managed state cannot be checked without Python 3.11+" >&2
     failures=$((failures + 1))
-  elif "$PYTHON" -c '
+  elif mode=$("$PYTHON" -c '
 import json
 import sys
+import tomllib
 from pathlib import Path
 
-state_path = Path(sys.argv[1])
+state_path, root, home = map(Path, sys.argv[1:])
 try:
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    if state.get("version") != 1 or state.get("mode") not in {"workflow", "full"}:
+    mode = state.get("mode")
+    if state.get("version") != 1 or mode not in {"off", "workflow", "full"}:
         raise ValueError("invalid version or mode")
     links = state.get("links")
     if not isinstance(links, dict) or not all(
@@ -102,20 +104,44 @@ try:
         for target, source in links.items()
     ):
         raise ValueError("invalid links")
-except (OSError, ValueError, json.JSONDecodeError) as error:
+    with (root / "gstack-capabilities.toml").open("rb") as handle:
+        catalog = tomllib.load(handle)
+except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as error:
     print(f"gstack managed state invalid: {error}", file=sys.stderr)
     raise SystemExit(1)
 
-mismatches = [
-    target
-    for target, source in links.items()
-    if not Path(target).is_symlink() or Path(target).resolve() != Path(source).resolve()
-]
-for target in mismatches:
+expected = {}
+if mode != "off":
+    skills = catalog["profiles"][mode]["skills"]
+    expected = {
+        home / ".codex" / "skills" / name: root / "generated" / "gstack-codex" / name
+        for name in skills
+    }
+    runtime = home / ".codex" / "skills" / "gstack"
+    expected.update({
+        runtime / "bin": root / "vendor" / "gstack" / "bin",
+        runtime / "ETHOS.md": root / "vendor" / "gstack" / "ETHOS.md",
+        runtime / "review": root / "vendor" / "gstack" / "review",
+    })
+    if mode == "full":
+        expected.update({
+            runtime / "browse": root / "vendor" / "gstack" / "browse",
+            runtime / "qa": root / "vendor" / "gstack" / "qa",
+        })
+
+recorded = {Path(target): Path(source) for target, source in links.items()}
+mismatches = []
+if set(links) != {str(target) for target in expected}:
+    mismatches.extend(sorted(set(links) ^ {str(target) for target in expected}))
+for target, source in expected.items():
+    if links.get(str(target)) != str(source) or not source.exists() or not target.is_symlink() or target.resolve() != source.resolve():
+        mismatches.append(str(target))
+for target in sorted(set(mismatches)):
     print(f"gstack managed link mismatch: {target}", file=sys.stderr)
-raise SystemExit(bool(mismatches))
-' "$GSTACK_STATE"; then
-    mode=$("$PYTHON" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["mode"])' "$GSTACK_STATE")
+if mismatches:
+    raise SystemExit(1)
+print(mode)
+' "$GSTACK_STATE" "$ROOT" "$HOME"); then
     echo "ok      gstack $mode"
   else
     failures=$((failures + 1))

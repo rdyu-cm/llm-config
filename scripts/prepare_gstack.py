@@ -80,6 +80,13 @@ def prepare(root: Path, mode: str, apply: bool, env: dict[str, str]) -> list[str
     )
     if mode == "full":
         subprocess.run([str(bun), "run", "build"], cwd=root / "vendor/gstack", env=child_env, check=True)
+    if mode == "full":
+        subprocess.run(
+            [str(bun), "x", "playwright", "install", "chromium"],
+            cwd=root / "vendor/gstack",
+            env=child_env,
+            check=True,
+        )
     return messages + [f"ready   gstack {mode}"]
 
 

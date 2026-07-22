@@ -22,6 +22,7 @@ class PrepareGstackTests(unittest.TestCase):
         self.assertEqual(install_call.args[0][-2:], ["install", "--frozen-lockfile"])
         self.assertEqual(install_call.kwargs["env"]["PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD"], "1")
         self.assertFalse(any("build" in call.args[0] for call in run.call_args_list))
+        self.assertFalse(any("playwright" in call.args[0] for call in run.call_args_list))
 
     def test_checksum_mismatch_stops_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory, \
@@ -49,10 +50,32 @@ class PrepareGstackTests(unittest.TestCase):
         with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
              patch("scripts.prepare_gstack.subprocess.run") as run:
             prepare(ROOT, "full", True, {"PATH": ""})
-        self.assertEqual([call.args[0][1] for call in run.call_args_list], ["install", "run"])
+        self.assertEqual([call.args[0][1] for call in run.call_args_list], ["install", "run", "x"])
         self.assertEqual(run.call_args_list[0].args[0][-2:], ["install", "--frozen-lockfile"])
         self.assertEqual(run.call_args_list[1].args[0], ["/fake/bun", "run", "build"])
 
+    def test_dry_run_never_installs_chromium(self) -> None:
+        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+             patch("scripts.prepare_gstack.subprocess.run") as run:
+            for mode in ("workflow", "full"):
+                prepare(ROOT, mode, False, {"PATH": ""})
+
+        run.assert_not_called()
+
+
+    def test_full_installs_chromium_after_build(self) -> None:
+        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+             patch("scripts.prepare_gstack.subprocess.run") as run:
+            prepare(ROOT, "full", True, {"PATH": ""})
+
+        self.assertEqual(
+            [call.args[0] for call in run.call_args_list],
+            [
+                ["/fake/bun", "install", "--frozen-lockfile"],
+                ["/fake/bun", "run", "build"],
+                ["/fake/bun", "x", "playwright", "install", "chromium"],
+            ],
+        )
     def test_installer_is_removed_after_checksum_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             installer = Path(directory) / "bun-install"

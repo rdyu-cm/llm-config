@@ -2,6 +2,7 @@ import io
 import shutil
 import os
 import subprocess
+import sys
 import tarfile
 import tempfile
 from contextlib import redirect_stderr
@@ -99,6 +100,35 @@ class UpdateGstackTests(unittest.TestCase):
             self.assertEqual(extracted, temporary / "out" / "gstack-abc")
             self.assertEqual((extracted / "LICENSE").read_bytes(), b"license")
 
+    def test_download_archive_uses_exact_candidate_url(self) -> None:
+        from scripts.update_gstack import download_archive
+
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "candidate.tar.gz"
+            response = io.BytesIO(b"candidate archive")
+            with patch("scripts.update_gstack.urllib.request.urlopen", return_value=response) as urlopen:
+                download_archive(CANDIDATE, destination)
+
+            urlopen.assert_called_once_with(
+                f"https://github.com/garrytan/gstack/archive/{CANDIDATE}.tar.gz",
+                timeout=30,
+            )
+            self.assertEqual(destination.read_bytes(), b"candidate archive")
+
+    def test_prepare_update_rejects_archive_root_for_different_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_repository(root)
+            archive = root / "candidate.tar.gz"
+            self._make_valid_archive(archive, root_name=f"gstack-{'f' * 40}")
+
+            with patch("scripts.update_gstack.generate_codex_skills") as generate:
+                with self.assertRaisesRegex(ValueError, "archive root.*candidate"):
+                    prepare_update(root, CANDIDATE, archive)
+
+            generate.assert_not_called()
+            self._assert_update_targets_old(root)
+
     def test_update_lock_changes_only_gstack_commit_line(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             lock = Path(directory) / "sources.lock.toml"
@@ -124,7 +154,7 @@ class UpdateGstackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             archive = root / "candidate.tar.gz"
-            write_archive(archive, {"gstack-candidate/LICENSE": b"only one file"})
+            write_archive(archive, {f"gstack-{CANDIDATE}/LICENSE": b"only one file"})
             with patch("scripts.update_gstack._ensure_targets_clean"):
                 with self.assertRaisesRegex(ValueError, "missing setup"):
                     prepare_update(root, CANDIDATE, archive)
@@ -322,6 +352,78 @@ class UpdateGstackTests(unittest.TestCase):
             self.assertEqual((target / "marker").read_text(encoding="utf-8"), "old")
             self.assertEqual((staged / "marker").read_text(encoding="utf-8"), "new")
 
+    def test_candidate_added_skill_requires_catalog_review_before_repo_touch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_repository(root)
+            archive = root / "candidate.tar.gz"
+            self._make_valid_archive(archive, extra_skills=("surprise",))
+
+            with patch("scripts.update_gstack.generate_codex_skills") as generate:
+                with self.assertRaisesRegex(ValueError, "review required.*added: gstack-surprise"):
+                    prepare_update(root, CANDIDATE, archive)
+
+            generate.assert_not_called()
+            self._assert_update_targets_old(root)
+
+    def test_candidate_removed_skill_requires_catalog_review_before_repo_touch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_repository(root)
+            archive = root / "candidate.tar.gz"
+            self._make_valid_archive(archive, skills=("gstack-upgrade",))
+
+            with patch("scripts.update_gstack.generate_codex_skills") as generate:
+                with self.assertRaisesRegex(ValueError, "review required.*removed: gstack-test"):
+                    prepare_update(root, CANDIDATE, archive)
+
+            generate.assert_not_called()
+            self._assert_update_targets_old(root)
+
+    def test_trusted_gate_runs_only_fixed_repository_validator(self) -> None:
+        from scripts.update_gstack import _run_trusted_integration_gate, write_source_metadata
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_repository(root)
+            (root / "scripts").mkdir()
+            validator = root / "scripts/validate.py"
+            validator.write_text("trusted validator fixture\n", encoding="utf-8")
+            update_lock_commit(root / "sources.lock.toml", CANDIDATE)
+            write_source_metadata(root / "vendor/gstack-source.toml", CANDIDATE)
+            self._write_generated_fixture(root, root / "vendor/gstack", root / "generated/gstack-codex")
+            completed = subprocess.CompletedProcess([], 0, stdout="validated\n")
+
+            with patch("scripts.update_gstack.subprocess.run", return_value=completed) as run:
+                _run_trusted_integration_gate(root, CANDIDATE)
+
+            run.assert_called_once_with(
+                [sys.executable, str(validator)],
+                cwd=root,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+
+    def test_trusted_gate_failure_rolls_back_all_four_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_repository(root)
+            archive = root / "candidate.tar.gz"
+            self._make_valid_archive(archive)
+
+            with patch(
+                "scripts.update_gstack.generate_codex_skills",
+                side_effect=self._write_generated_fixture,
+            ), patch(
+                "scripts.update_gstack._run_trusted_integration_gate",
+                side_effect=RuntimeError("trusted integration gate failed"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "trusted integration gate failed"):
+                    prepare_update(root, CANDIDATE, archive)
+
+            self._assert_update_targets_old(root)
+
     def test_prepare_update_stages_generation_and_leaves_only_reviewable_changes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -346,7 +448,17 @@ class UpdateGstackTests(unittest.TestCase):
                         encoding="utf-8",
                     )
 
-            with patch("scripts.update_gstack.generate_codex_skills", side_effect=generate):
+            def gate(gate_root: Path, candidate: str) -> None:
+                self.assertEqual(gate_root, root)
+                self.assertEqual(candidate, CANDIDATE)
+                self.assertEqual((root / "vendor/gstack/LICENSE").read_text(), "new license")
+                self.assertIn("test skill description", (root / "generated/gstack-codex/gstack-test/SKILL.md").read_text())
+                self.assertIn(CANDIDATE, (root / "sources.lock.toml").read_text())
+                self.assertIn(CANDIDATE, (root / "vendor/gstack-source.toml").read_text())
+
+            with patch("scripts.update_gstack.generate_codex_skills", side_effect=generate), patch(
+                "scripts.update_gstack._run_trusted_integration_gate", side_effect=gate
+            ):
                 prepare_update(root, CANDIDATE, archive)
 
             status = subprocess.check_output(
@@ -367,6 +479,8 @@ class UpdateGstackTests(unittest.TestCase):
                     "vendor/gstack/hosts/codex.ts",
                     "vendor/gstack/package.json",
                     "vendor/gstack/setup",
+                    "vendor/gstack/test/SKILL.md.tmpl",
+                    "vendor/gstack/gstack-upgrade/SKILL.md.tmpl",
                 },
             )
             self.assertEqual((root / "vendor/gstack/LICENSE").read_text(encoding="utf-8"), "new license")
@@ -447,7 +561,8 @@ class UpdateGstackTests(unittest.TestCase):
             errors = io.StringIO()
             with redirect_stderr(errors), \
                  patch("scripts.update_gstack.generate_codex_skills", side_effect=self._write_generated_fixture), \
-                 patch("scripts.update_gstack.shutil.rmtree", side_effect=fail_backup_cleanup):
+                 patch("scripts.update_gstack.shutil.rmtree", side_effect=fail_backup_cleanup), \
+                 patch("scripts.update_gstack._run_trusted_integration_gate"):
                 prepare_update(root, CANDIDATE, archive)
             self.assertEqual((root / "vendor/gstack/LICENSE").read_text(encoding="utf-8"), "new license")
             self.assertIn("backup cleanup failed", errors.getvalue())
@@ -467,21 +582,40 @@ class UpdateGstackTests(unittest.TestCase):
             self.assertEqual(after, before)
             self.assertEqual((root / "vendor/gstack/LICENSE").read_text(encoding="utf-8"), "old license")
 
-    def _make_valid_archive(self, archive: Path) -> None:
-        write_archive(
-            archive,
-            {
-                "gstack-candidate/LICENSE": b"new license",
-                "gstack-candidate/setup": b"#!/bin/sh\n",
-                "gstack-candidate/package.json": b"{}\n",
-                "gstack-candidate/hosts/codex.ts": b"export default {};\n",
-            },
+    def _make_valid_archive(
+        self,
+        archive: Path,
+        *,
+        root_name: str | None = None,
+        skills: tuple[str, ...] = ("test", "gstack-upgrade"),
+        extra_skills: tuple[str, ...] = (),
+    ) -> None:
+        root_name = root_name or f"gstack-{CANDIDATE}"
+        members = {
+            f"{root_name}/LICENSE": b"new license",
+            f"{root_name}/setup": b"#!/bin/sh\n",
+            f"{root_name}/package.json": b"{}\n",
+            f"{root_name}/hosts/codex.ts": b"export default {};\n",
+        }
+        for skill in (*skills, *extra_skills):
+            members[f"{root_name}/{skill}/SKILL.md.tmpl"] = b"canonical skill template\n"
+        write_archive(archive, members)
+
+    def _assert_update_targets_old(self, root: Path) -> None:
+        self.assertEqual((root / "vendor/gstack/LICENSE").read_text(), "old license")
+        self.assertFalse((root / "vendor/gstack/test").exists())
+        self.assertEqual(
+            (root / "generated/gstack-codex/gstack-test/SKILL.md").read_text(),
+            "old skill",
         )
+        self.assertFalse((root / "generated/gstack-codex/gstack-upgrade").exists())
+        self.assertIn('commit = "old"', (root / "sources.lock.toml").read_text())
+        self.assertIn('commit = "old"', (root / "vendor/gstack-source.toml").read_text())
 
     def _write_generated_fixture(self, _root: Path, _vendor: Path, generated: Path) -> None:
         for name in ("gstack-test", "gstack-upgrade"):
             skill = generated / name
-            (skill / "agents").mkdir(parents=True)
+            (skill / "agents").mkdir(parents=True, exist_ok=True)
             (skill / "SKILL.md").write_text(
                 f"---\nname: {name}\ndescription: test skill description\n---\nbody\n", encoding="utf-8"
             )

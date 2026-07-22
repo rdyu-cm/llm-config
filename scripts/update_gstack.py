@@ -118,6 +118,36 @@ def _catalog_skill_names(root: Path) -> set[str]:
     return set(skills) | {"gstack-upgrade"}
 
 
+def _validate_candidate_inventory(root: Path, vendor: Path) -> None:
+    actual: set[str] = set()
+    for directory in vendor.iterdir():
+        if directory.is_symlink() or not directory.is_dir():
+            continue
+        template = directory / "SKILL.md.tmpl"
+        if not template.exists():
+            continue
+        if template.is_symlink() or not template.is_file():
+            raise ValueError(f"candidate skill template is unsafe: {directory.name}")
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]*", directory.name) is None:
+            raise ValueError(f"candidate skill directory is invalid: {directory.name}")
+        actual.add(
+            directory.name if directory.name == "gstack-upgrade" else f"gstack-{directory.name}"
+        )
+
+    expected = _catalog_skill_names(root)
+    added = sorted(actual - expected)
+    removed = sorted(expected - actual)
+    if added or removed:
+        details = []
+        if added:
+            details.append(f"added: {', '.join(added)}")
+        if removed:
+            details.append(f"removed: {', '.join(removed)}")
+        raise ValueError(
+            f"candidate skill inventory changed; catalog review required ({'; '.join(details)})"
+        )
+
+
 def _validate_generated_tree(root: Path, generated: Path) -> None:
     expected = _catalog_skill_names(root)
     actual = {path.name for path in generated.iterdir() if path.is_dir() and not path.is_symlink()}
@@ -374,6 +404,34 @@ def _ensure_targets_clean(root: Path) -> None:
         raise ValueError("gstack update targets contain uncommitted changes")
 
 
+def _run_trusted_integration_gate(root: Path, candidate: str) -> None:
+    validate_candidate(candidate)
+    validate_vendor_tree(root / "vendor/gstack")
+    _validate_generated_tree(root, root / "generated/gstack-codex")
+
+    source = _gstack_source(root)
+    if source["commit"] != candidate:
+        raise ValueError("installed gstack lock does not match candidate")
+    with (root / "vendor/gstack-source.toml").open("rb") as handle:
+        metadata = tomllib.load(handle)
+    if metadata != {"repository": REPOSITORY, "commit": candidate}:
+        raise ValueError("installed gstack source metadata does not match candidate")
+
+    validator = root / "scripts/validate.py"
+    if not validator.is_file() or validator.is_symlink():
+        raise ValueError("trusted repository validator is missing or unsafe")
+    result = subprocess.run(
+        [sys.executable, str(validator)],
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if result.returncode != 0:
+        detail = result.stdout.strip() or f"exit status {result.returncode}"
+        raise RuntimeError(f"trusted repository validation failed: {detail}")
+
+
 def _install_update(root: Path, candidate: str, staged_vendor: Path, staged_generated: Path) -> None:
     vendor_target = root / "vendor/gstack"
     generated_target = root / "generated/gstack-codex"
@@ -404,6 +462,7 @@ def _install_update(root: Path, candidate: str, staged_vendor: Path, staged_gene
         replace_directory(staged_generated, generated_target)
         update_lock_commit(lock_path, candidate)
         write_source_metadata(metadata_path, candidate)
+        _run_trusted_integration_gate(root, candidate)
     except BaseException:
         rollback_error: BaseException | None = None
         for staged, target in reversed(replacements):
@@ -444,7 +503,13 @@ def prepare_update(root: Path, candidate: str, archive: Path) -> None:
 
     with tempfile.TemporaryDirectory(prefix="gstack-extract-") as extraction_directory:
         extracted = extract_archive(archive, Path(extraction_directory) / "archive")
+        expected_root = f"gstack-{candidate}"
+        if extracted.name != expected_root:
+            raise ValueError(
+                f"archive root does not match candidate: expected {expected_root}, got {extracted.name}"
+            )
         validate_vendor_tree(extracted)
+        _validate_candidate_inventory(root, extracted)
 
         vendor_parent = root / "vendor"
         generated_parent = root / "generated"

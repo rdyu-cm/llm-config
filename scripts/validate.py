@@ -92,6 +92,50 @@ def validate_gstack_vendor(root: Path, lock: dict) -> None:
         fail("gstack commit metadata does not match sources.lock.toml")
 
 
+def find_workflow_browser_policy_violations(text: str) -> list[str]:
+    """Return executable browser-launch and browser-setup guidance by line."""
+    violations: list[str] = []
+    launch_command = re.compile(
+        r"(?i)(?:^|`)\s*(?:xdg-open\s+\S+|open\s+"
+        r"(?:(?:https?|file)://|[\"'$~/.]|URL\d*\b|\S+\.(?:html?|pdf|png)))"
+    )
+    platform_start = re.compile(
+        r"(?i)(?:^|`)\s*start(?:\s+\"[^\"]*\")?\s+"
+        r"(?:(?:https?|file)://|[\"'$~/.])"
+    )
+    setup_guidance = re.compile(
+        r"(?i)\$D setup|cd <SKILL_DIR> && \./setup|bun\.sh/install|"
+        r"install (?:bun|browser)|(?:browse|browser|designer|visual mockup)"
+        r"[^.\n]{0,80}(?:needs? (?:a )?(?:build|setup)|(?:isn't|is not) set up)"
+    )
+    positive_browser_wording = re.compile(
+        r"(?i)\b(?:default|your) browser\b|\b(?:then|and) open it\b|"
+        r"\b(?:board|browser tab)\b[^.\n]{0,60}\b(?:open|opened)\b"
+    )
+    open_authorization = re.compile(r"(?i)`open`\s+(?:for|\(fallback|is allowed)|fallback for viewing boards")
+    for line_number, line in enumerate(text.splitlines(), 1):
+        reasons: list[str] = []
+        if launch_command.search(line) or re.search(r"(?i)run\s+`(?:open|xdg-open)`", line):
+            reasons.append("launch command")
+        if platform_start.search(line):
+            reasons.append("platform start command")
+        if "file://" in line:
+            reasons.append("file URL")
+        if "--serve" in line or re.search(r"\$D\s+serve\b", line):
+            reasons.append("browser-serving command")
+        if setup_guidance.search(line):
+            reasons.append("setup guidance")
+        if open_authorization.search(line):
+            reasons.append("open authorization")
+        negative_browser_absence = re.search(
+            r"(?i)\b(?:do not|don't|never|without|skip|not available|non-browser)\b", line
+        )
+        if positive_browser_wording.search(line) and not negative_browser_absence:
+            reasons.append("browser-launch wording")
+        violations.extend(f"line {line_number}: {reason}" for reason in reasons)
+    return violations
+
+
 def validate_gstack_catalog(root: Path) -> int:
     catalog = load_toml(root / "gstack-capabilities.toml")
     profiles = catalog.get("profiles")
@@ -132,6 +176,17 @@ def validate_gstack_catalog(root: Path) -> int:
         metadata = parse_frontmatter(path)
         if metadata["name"] != name:
             fail(f"generated gstack skill name does not match catalog: {name}")
+
+    for name in lists["workflow"]:
+        path = root / "generated" / "gstack-codex" / name / "SKILL.md"
+        violations = find_workflow_browser_policy_violations(
+            path.read_text(encoding="utf-8")
+        )
+        if violations:
+            fail(
+                f"gstack workflow browser launch policy violation in {name}: "
+                f"{'; '.join(violations)}"
+            )
 
     sidecars = sorted((root / "generated" / "gstack-codex").glob("gstack-*/agents/openai.yaml"))
     sidecar_names = {path.parents[1].name for path in sidecars}

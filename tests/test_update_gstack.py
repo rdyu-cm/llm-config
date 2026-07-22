@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 from contextlib import redirect_stderr
 import unittest
 from pathlib import Path
@@ -245,23 +246,42 @@ class UpdateGstackTests(unittest.TestCase):
     def test_adapter_rewrites_workflow_browser_fallbacks(self) -> None:
         from scripts.update_gstack import _adapt_codex_skill
 
+        with (ROOT / "gstack-capabilities.toml").open("rb") as handle:
+            workflow = tomllib.load(handle)["profiles"]["workflow"]["skills"]
+        from tests.test_gstack_catalog import workflow_browser_policy_violations
+
+        violations = {}
+        for name in workflow:
+            relative = name.removeprefix("gstack-")
+            source = (ROOT / "vendor/gstack" / relative / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            adapted = _adapt_codex_skill(source, name, workflow_safe=True)
+            found = workflow_browser_policy_violations(adapted)
+            if found:
+                violations[name] = found
+        self.assertEqual(violations, {})
+
         office_hours = _adapt_codex_skill(
             (ROOT / "vendor/gstack/office-hours/SKILL.md").read_text(encoding="utf-8"),
             "gstack-office-hours",
+            workflow_safe=True,
         )
         plan_design = _adapt_codex_skill(
             (ROOT / "vendor/gstack/plan-design-review/SKILL.md").read_text(encoding="utf-8"),
             "gstack-plan-design-review",
+            workflow_safe=True,
         )
 
         self.assertNotIn("NEEDS_SETUP", office_hours)
         self.assertNotIn("bun.sh/install", office_hours)
         self.assertNotIn("Run the setup script to enable it.", office_hours)
-        self.assertIn("skip browser preview and setup", office_hours)
+        self.assertIn("Skip browser preview and setup", office_hours)
         self.assertIn("report the saved artifact path", office_hours)
-        self.assertIn('$B goto "file://$SKETCH_FILE"', office_hours)
+        self.assertNotIn("file://", office_hours)
+        self.assertIn("Report the HTML artifact path", office_hours)
 
-        self.assertNotIn("open file://", plan_design)
+        self.assertNotIn("--serve", plan_design)
         self.assertIn("save the comparison board HTML", plan_design)
         self.assertIn("report its artifact path", plan_design)
         self.assertIn("continue the non-browser review flow", plan_design)
@@ -281,6 +301,7 @@ class UpdateGstackTests(unittest.TestCase):
             (root / "generated/gstack-codex/gstack-upgrade").mkdir()
             (root / "gstack-capabilities.toml").write_text(
                 'version = 1\n[bun]\nversion = "1.3.10"\n'
+                '[profiles.workflow]\nskills = ["gstack-test"]\n'
                 '[profiles.full]\nskills = ["gstack-test"]\n',
                 encoding="utf-8",
             )

@@ -119,6 +119,16 @@ def _catalog_skill_names(root: Path) -> set[str]:
     return set(skills) | {"gstack-upgrade"}
 
 
+def _catalog_workflow_skill_names(root: Path) -> set[str]:
+    catalog = _load_catalog(root)
+    skills = catalog.get("profiles", {}).get("workflow", {}).get("skills")
+    if not isinstance(skills, list) or not all(isinstance(name, str) for name in skills):
+        raise ValueError("gstack workflow profile must contain a skills list")
+    if len(skills) != len(set(skills)):
+        raise ValueError("gstack workflow profile contains duplicate skill names")
+    return set(skills)
+
+
 def _validate_candidate_inventory(root: Path, vendor: Path) -> None:
     actual: set[str] = set()
     for directory in vendor.iterdir():
@@ -185,6 +195,8 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
                 "cd <SKILL_DIR> && ./setup",
                 "bun.sh/install",
                 "Run the setup script to enable it.",
+                "file://",
+                "--serve",
             )
             if any(fallback in frontmatter for fallback in browser_setup_fallbacks):
                 raise ValueError(
@@ -192,9 +204,9 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
                     "gstack-office-hours"
                 )
             for instruction in (
-                "skip browser preview and setup",
+                "Skip browser preview and setup",
                 "report the saved artifact path",
-                '$B goto "file://$SKETCH_FILE"',
+                "Report the HTML artifact path",
             ):
                 if instruction not in frontmatter:
                     raise ValueError(
@@ -202,7 +214,10 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
                         "gstack-office-hours"
                     )
         if name == "gstack-plan-design-review":
-            if "open file://" in frontmatter:
+            if any(
+                fallback in frontmatter
+                for fallback in ("open file://", "--serve", "$D serve")
+            ):
                 raise ValueError(
                     "generated gstack skill contains a system browser fallback: "
                     "gstack-plan-design-review"
@@ -251,7 +266,7 @@ def write_codex_metadata(path: Path, name: str) -> None:
     )
 
 
-def _adapt_codex_skill(source: str, name: str) -> str:
+def _adapt_codex_skill(source: str, name: str, *, workflow_safe: bool = False) -> str:
     match = re.fullmatch(r"---\r?\n(.*?)\r?\n---\r?\n?(.*)", source, re.DOTALL)
     if match is None:
         raise ValueError(f"candidate skill is missing frontmatter: {name}")
@@ -311,34 +326,110 @@ def _adapt_codex_skill(source: str, name: str) -> str:
         (".claude/skills", ".agents/skills"),
     ):
         adapted = adapted.replace(old, new)
-    return _apply_workflow_safe_fallbacks(adapted, name)
+    if workflow_safe:
+        return _apply_workflow_safe_fallbacks(adapted, name)
+    return adapted
 
 
 def _apply_workflow_safe_fallbacks(adapted: str, name: str) -> str:
-    """Keep workflow-only profiles usable without installing browser tooling."""
+    """Remove launch/setup flows from skills shared by the workflow profile."""
+    adapted = adapted.replace(
+        ", writes to the plan file, and `open` for generated artifacts.",
+        ", and writes to the plan file.",
+    )
+    adapted = re.sub(
+        r'(?m)^If `LAKE_INTRO` is `no`: say (?P<message>".*") Offer to open:\n\n'
+        r'```bash\nopen (?P<url>https://\S+)\ntouch (?P<marker>\S+)\n```\n\n'
+        r'Only run `open` if yes\. Always run `touch`\.',
+        lambda match: (
+            f"If `LAKE_INTRO` is `no`: say {match.group('message')}. "
+            "Report the URL above without launching it, then run:\n\n"
+            f"```bash\ntouch {match.group('marker')}\n```"
+        ),
+        adapted,
+    )
     if name == "gstack-office-hours":
-        adapted = adapted.replace(
-            "## SETUP (run this check BEFORE any browse command)",
-            "## OPTIONAL BROWSER RUNTIME (check before preview)",
-            1,
-        )
-        adapted = adapted.replace('  echo "NEEDS_SETUP"', '  echo "BROWSE_NOT_AVAILABLE"', 1)
         adapted = re.sub(
-            r"(?ms)^If `NEEDS_SETUP`:\n.*?^   ```\n\n(?=# YC Office Hours)",
-            "If `BROWSE_NOT_AVAILABLE`: skip browser preview and setup. Do not install Bun,\n"
-            "run setup, or recommend setup. Continue the text/artifact workflow and\n"
-            "report the saved artifact path whenever a preview file is produced.\n\n",
+            r"(?ms)^## (?:SETUP \(run this check BEFORE any browse command\)|"
+            r"OPTIONAL BROWSER RUNTIME \(check before preview\))\n.*?(?=^# YC Office Hours)",
+            "## Browser-free workflow\n\n"
+            "Skip browser preview and setup. Do not install or recommend browser tooling. "
+            "Continue the text/artifact workflow and report the saved artifact path whenever "
+            "a preview file is produced.\n\n",
+            adapted,
+            count=1,
+        )
+        adapted = re.sub(
+            r"(?ms)^\*\*Step 4: Show variants inline, then open comparison board\*\*\n.*?"
+            r"(?=^\*\*Step 6: Save approved choice\*\*)",
+            "**Step 4: Save the comparison artifact**\n\n"
+            "Show each variant inline with the Read tool, then write the comparison HTML:\n\n"
+            "```bash\n"
+            '$D compare --images "$_DESIGN_DIR/variant-A.png,$_DESIGN_DIR/variant-B.png,'
+            '$_DESIGN_DIR/variant-C.png" --output "$_DESIGN_DIR/design-board.html"\n'
+            "```\n\n"
+            "Report the saved comparison artifact path. Do not start a server or launch a "
+            "browser.\n\n"
+            "**Step 5: Continue in text**\n\n"
+            "Skip the browser-only comparison loop. Use the inline variants and "
+            "AskUserQuestion for any necessary choice, then continue the text workflow.\n\n",
+            adapted,
+            count=1,
+        )
+        adapted = re.sub(
+            r"(?ms)^\*\*Step 3: Render and capture\*\*\n.*?"
+            r"(?=^\*\*Step 6: Outside design voices\*\*)",
+            "**Step 3: Keep the HTML artifact**\n\n"
+            "Do not launch a preview or capture a screenshot. Report the HTML artifact path in "
+            "`SKETCH_FILE`, skip browser-only iteration, and continue the text workflow.\n\n"
+            "**Step 4: Continue without preview**\n\n"
+            "Record any textual feedback directly in the HTML or design doc.\n\n"
+            "**Step 5: Include in design doc**\n\n"
+            "Reference the saved HTML artifact in the design doc's Recommended Approach section.\n\n",
             adapted,
             count=1,
         )
         adapted = adapted.replace(
-            "If `$B` is not available (browse binary not set up), skip the render step. Tell the\n"
-            'user: "Visual sketch requires the browse binary. Run the setup script to enable it."',
-            "If `$B` is not available, skip the render and screenshot step, report the saved\n"
-            "artifact path in `SKETCH_FILE`, and continue the text/artifact workflow.",
+            '- If yes: run `open https://ycombinator.com/apply?ref=gstack` and say: '
+            '"Bring this design doc to your YC interview. It\'s better than most pitch decks."',
+            '- If yes: report `https://ycombinator.com/apply?ref=gstack` and say: '
+            '"Bring this design doc to your YC interview. It\'s better than most pitch decks."',
             1,
         )
+        adapted = adapted.replace(
+            "second person, referencing specific things they said across sessions. Then open it:\n"
+            "```bash\n"
+            'eval "$($GSTACK_ROOT/bin/gstack-paths)"\n'
+            'open "$GSTACK_STATE_ROOT/builder-journey.md"\n'
+            "```",
+            "second person, referencing specific things they said across sessions. Then report "
+            "its artifact path:\n"
+            "```bash\n"
+            'eval "$($GSTACK_ROOT/bin/gstack-paths)"\n'
+            'printf \'%s\\n\' "$GSTACK_STATE_ROOT/builder-journey.md"\n'
+            "```",
+            1,
+        )
+        adapted = adapted.replace(
+            "Auto-generate updated `~/.gstack/builder-journey.md` with narrative arc. Open it.",
+            "Auto-generate updated `~/.gstack/builder-journey.md` with narrative arc and report "
+            "its artifact path.",
+            1,
+        )
+        adapted = re.sub(
+            r"(?ms)^3\. Use AskUserQuestion to offer opening the resources:\n.*?"
+            r"(?=^### Next-skill recommendations)",
+            "3. Present the selected resource URLs directly in the response. Do not launch them. "
+            "Then continue to next-skill recommendations.\n\n",
+            adapted,
+            count=1,
+        )
     elif name == "gstack-plan-design-review":
+        adapted = adapted.replace(
+            "- `open` (fallback for viewing boards when `$B` is not available)\n",
+            "",
+            1,
+        )
         adapted = adapted.replace(
             '  echo "BROWSE_NOT_AVAILABLE (will use \'open\' to view comparison boards)"',
             '  echo "BROWSE_NOT_AVAILABLE (comparison board will remain a saved artifact)"',
@@ -351,7 +442,47 @@ def _apply_workflow_safe_fallbacks(adapted: str, name: str) -> str:
             "and continue the non-browser review flow. Do not invoke a system browser.",
             1,
         )
+        adapted = adapted.replace(
+            '- `$D compare --images "a.png,b.png,c.png" --output /path/board.html --serve` — '
+            "comparison board + HTTP server\n"
+            "- `$D serve --html /path/board.html` — serve comparison board and collect feedback "
+            "via HTTP",
+            '- `$D compare --images "a.png,b.png,c.png" --output /path/board.html` — write the '
+            "comparison board HTML artifact",
+            1,
+        )
+        adapted = re.sub(
+            r"(?ms)^\*\*Do NOT show variants inline via Read tool and ask for preferences\.\*\*"
+            r".*?(?=^## The 0-10 Rating Method)",
+            "**Artifact-only comparison**\n\n"
+            "If `DESIGN_READY`, show generated variants inline with the Read tool and write the "
+            "comparison artifact:\n\n"
+            "```bash\n"
+            '$D compare --images "$_DESIGN_DIR/variant-A.png,$_DESIGN_DIR/variant-B.png,'
+            '$_DESIGN_DIR/variant-C.png" --output "$_DESIGN_DIR/design-board.html"\n'
+            "```\n\n"
+            "Report the saved comparison artifact path. Do not start a server or launch a browser. "
+            "Skip the browser-only feedback loop and continue the text review, using "
+            "AskUserQuestion for genuine design choices.\n\n"
+            "If `DESIGN_NOT_AVAILABLE`, skip visual generation and setup guidance. Continue the "
+            "text review and report any artifacts already produced.\n\n",
+            adapted,
+            count=1,
+        )
+        adapted = adapted.replace(
+            "* **NEVER use AskUserQuestion to ask which variant the user prefers.** Always create "
+            "a comparison board first (`$D compare --serve`) and open it in the browser. The board "
+            "has rating controls, comments, remix/regenerate buttons, and structured feedback "
+            "output. Use AskUserQuestion ONLY to notify the user the board is open and wait for "
+            'them to finish — not to present variants inline and ask "which do you prefer?" That '
+            "is a degraded experience.",
+            "* Use AskUserQuestion for any necessary variant preference in the text workflow. "
+            "Do not serve or launch the comparison artifact.",
+            1,
+        )
     return adapted
+
+
 
 
 def _suppress_trusted_codex_sections(
@@ -382,6 +513,7 @@ def _candidate_skill_path(vendor: Path, name: str) -> Path:
 def generate_codex_skills(root: Path, staged_vendor: Path, staged_generated: Path) -> None:
     trusted_generated = root / "generated/gstack-codex"
     trusted_vendor = root / "vendor/gstack"
+    workflow_skills = _catalog_workflow_skill_names(root)
     for name in sorted(_catalog_skill_names(root)):
         destination = staged_generated / name
         source = _candidate_skill_path(staged_vendor, name)
@@ -400,7 +532,10 @@ def generate_codex_skills(root: Path, staged_vendor: Path, staged_generated: Pat
             shutil.copytree(fallback, destination)
         elif not source.is_symlink():
             destination.mkdir()
-            adapted = _adapt_codex_skill(source.read_text(encoding="utf-8"), name)
+            workflow_safe = name in workflow_skills
+            adapted = _adapt_codex_skill(
+                source.read_text(encoding="utf-8"), name, workflow_safe=workflow_safe
+            )
             trusted_skill = fallback / "SKILL.md"
             if (
                 trusted_source.is_file()
@@ -410,7 +545,11 @@ def generate_codex_skills(root: Path, staged_vendor: Path, staged_generated: Pat
             ):
                 adapted = _suppress_trusted_codex_sections(
                     adapted,
-                    _adapt_codex_skill(trusted_source.read_text(encoding="utf-8"), name),
+                    _adapt_codex_skill(
+                        trusted_source.read_text(encoding="utf-8"),
+                        name,
+                        workflow_safe=workflow_safe,
+                    ),
                     trusted_skill.read_text(encoding="utf-8"),
                 )
             (destination / "SKILL.md").write_text(adapted, encoding="utf-8")

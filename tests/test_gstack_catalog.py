@@ -21,7 +21,7 @@ RUNTIME_SKILLS = {
     "GSTACK_BROWSE": {
         "gstack-benchmark", "gstack-browse", "gstack-canary", "gstack-design-consultation",
         "gstack-design-html", "gstack-design-review", "gstack-design-shotgun",
-        "gstack-devex-review", "gstack-land-and-deploy", "gstack-office-hours",
+        "gstack-devex-review", "gstack-land-and-deploy",
         "gstack-open-gstack-browser", "gstack-pair-agent", "gstack-plan-design-review",
         "gstack-qa", "gstack-qa-only", "gstack-setup-browser-cookies",
     },
@@ -31,6 +31,49 @@ RUNTIME_SKILLS = {
     },
     "GSTACK_MAKE_PDF": {"gstack-make-pdf"},
 }
+
+
+def workflow_browser_policy_violations(text: str) -> list[str]:
+    violations: list[str] = []
+    launch_command = re.compile(
+        r"(?i)(?:^|`)\s*(?:xdg-open\s+\S+|open\s+"
+        r"(?:(?:https?|file)://|[\"'$~/.]|URL\d*\b|\S+\.(?:html?|pdf|png)))"
+    )
+    platform_start = re.compile(
+        r"(?i)(?:^|`)\s*start(?:\s+\"[^\"]*\")?\s+"
+        r"(?:(?:https?|file)://|[\"'$~/.])"
+    )
+    setup_guidance = re.compile(
+        r"(?i)\$D setup|cd <SKILL_DIR> && \./setup|bun\.sh/install|"
+        r"install (?:bun|browser)|(?:browse|browser|designer|visual mockup)"
+        r"[^.\n]{0,80}(?:needs? (?:a )?(?:build|setup)|(?:isn't|is not) set up)"
+    )
+    positive_browser_wording = re.compile(
+        r"(?i)\b(?:default|your) browser\b|\b(?:then|and) open it\b|"
+        r"\b(?:board|browser tab)\b[^.\n]{0,60}\b(?:open|opened)\b"
+    )
+    open_authorization = re.compile(r"(?i)`open`\s+(?:for|\(fallback|is allowed)|fallback for viewing boards")
+    for line_number, line in enumerate(text.splitlines(), 1):
+        reasons: list[str] = []
+        if launch_command.search(line) or re.search(r"(?i)run\s+`(?:open|xdg-open)`", line):
+            reasons.append("launch command")
+        if platform_start.search(line):
+            reasons.append("platform start command")
+        if "file://" in line:
+            reasons.append("file URL")
+        if "--serve" in line or re.search(r"\$D\s+serve\b", line):
+            reasons.append("browser-serving command")
+        if setup_guidance.search(line):
+            reasons.append("setup guidance")
+        if open_authorization.search(line):
+            reasons.append("open authorization")
+        negative_browser_absence = re.search(
+            r"(?i)\b(?:do not|don't|never|without|skip|not available|non-browser)\b", line
+        )
+        if positive_browser_wording.search(line) and not negative_browser_absence:
+            reasons.append("browser-launch wording")
+        violations.extend(f"line {line_number}: {reason}" for reason in reasons)
+    return violations
 
 
 class GstackCatalogTests(unittest.TestCase):
@@ -53,33 +96,40 @@ class GstackCatalogTests(unittest.TestCase):
             for name in expected_skills:
                 self.assertRegex(texts[name], rf"(?m)^{variable}=", name)
 
-    def test_workflow_skills_skip_optional_browser_setup_and_system_open(self) -> None:
-        generated = ROOT / "generated/gstack-codex"
-        office_hours = (generated / "gstack-office-hours/SKILL.md").read_text(encoding="utf-8")
-        plan_design = (generated / "gstack-plan-design-review/SKILL.md").read_text(
-            encoding="utf-8"
+    def test_workflow_catalog_has_no_browser_launch_or_setup_guidance(self) -> None:
+        with (ROOT / "gstack-capabilities.toml").open("rb") as handle:
+            workflow = tomllib.load(handle)["profiles"]["workflow"]["skills"]
+        self.assertEqual(len(workflow), 28)
+
+        violations = {}
+        for name in workflow:
+            text = (ROOT / "generated/gstack-codex" / name / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            found = workflow_browser_policy_violations(text)
+            if found:
+                violations[name] = found
+        self.assertEqual(violations, {})
+
+    def test_workflow_browser_policy_allows_browser_absence_prose(self) -> None:
+        safe = (
+            "If the runtime is not available, skip the preview and continue the non-browser "
+            "workflow. Do not invoke a system browser; report the saved artifact path."
         )
+        self.assertEqual(workflow_browser_policy_violations(safe), [])
 
-        for name, text in (
-            ("gstack-office-hours", office_hours),
-            ("gstack-plan-design-review", plan_design),
-        ):
-            for forbidden in (
-                "NEEDS_SETUP",
-                "cd <SKILL_DIR> && ./setup",
-                "bun.sh/install",
-                "Run the setup script to enable it.",
-                "open file://",
-            ):
-                self.assertNotIn(forbidden, text, name)
-        self.assertIn("skip browser preview and setup", office_hours)
-        self.assertIn("report the saved artifact path", office_hours)
-        self.assertIn('$B goto "file://$SKETCH_FILE"', office_hours)
-
-        self.assertIn("save the comparison board HTML", plan_design)
-        self.assertIn("report its artifact path", plan_design)
-        self.assertIn("continue the non-browser review flow", plan_design)
-        self.assertIn("BROWSE_READY: $B", plan_design)
+    def test_catalog_validator_rejects_workflow_browser_launch_command(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            temporary_root = Path(directory)
+            shutil.copy(ROOT / "gstack-capabilities.toml", temporary_root / "gstack-capabilities.toml")
+            shutil.copytree(ROOT / "generated", temporary_root / "generated")
+            skill = temporary_root / "generated/gstack-codex/gstack-review/SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8") + "\n```bash\nxdg-open artifact.html\n```\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "browser launch policy.*gstack-review"):
+                validate_gstack_catalog(temporary_root)
 
     def test_workflow_catalog_excludes_browser_capabilities(self) -> None:
         with (ROOT / "gstack-capabilities.toml").open("rb") as handle:

@@ -207,7 +207,7 @@ Skip if `TEL_PROMPTED` is `yes`.
 
 If `PROACTIVE_PROMPTED` is `no` AND `TEL_PROMPTED` is `yes`: ask once:
 
-> Let gstack proactively suggest skills, like /qa for "does this work?" or /investigate for bugs?
+> Let gstack proactively suggest skills, like running the project's tests for "does this work?" or /investigate for bugs?
 
 Options:
 - A) Keep it on (recommended)
@@ -225,7 +225,7 @@ Skip if `PROACTIVE_PROMPTED` is `yes`.
 
 ## First-run guidance (one-time)
 
-If `ACTIVATED` is `no` (first skill run on this machine) AND the preamble printed a non-empty `FIRST_TASK:` value that is NOT `nongit`: show ONE short, project-specific line mapped from the token, as a heads-up, then CONTINUE with whatever the user actually asked — do NOT halt their task. Map the token: `greenfield` → "Fresh repo — shape it first with `/spec` or `/office-hours`." `code_node`/`code_python`/`code_rust`/`code_go`/`code_ruby`/`code_ios` → "There's code here — `/qa` to see it work, or `/investigate` if something's off." `branch_ahead` → "Unshipped work on this branch — `/review` then `/ship`." `dirty_default` → "Uncommitted changes — `/review` before committing." `clean_default` → "Pick one: `/spec`, `/investigate`, or `/qa`." Then substitute the token you saw for TASK_TOKEN and run (best-effort), and mark activated:
+If `ACTIVATED` is `no` (first skill run on this machine) AND the preamble printed a non-empty `FIRST_TASK:` value that is NOT `nongit`: show ONE short, project-specific line mapped from the token, as a heads-up, then CONTINUE with whatever the user actually asked — do NOT halt their task. Map the token: `greenfield` → "Fresh repo — shape it first with `/spec` or `/office-hours`." `code_node`/`code_python`/`code_rust`/`code_go`/`code_ruby`/`code_ios` → "There's code here — run its automated tests, or `/investigate` if something's off." `branch_ahead` → "Unshipped work on this branch — `/review` then `/ship`." `dirty_default` → "Uncommitted changes — `/review` before committing." `clean_default` → "Pick one: `/spec`, `/investigate`, or `/review`." Then substitute the token you saw for TASK_TOKEN and run (best-effort), and mark activated:
 ```bash
 $GSTACK_BIN/gstack-telemetry-log --event-type first_task_scaffold_shown --skill "TASK_TOKEN" --outcome shown 2>/dev/null || true
 touch ~/.gstack/.activated 2>/dev/null || true
@@ -267,7 +267,7 @@ Key routing rules:
 - Design system/plan review → invoke /design-consultation or /plan-design-review
 - Full review pipeline → invoke /autoplan
 - Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
+- Verification → run existing automated tests and inspect logs, command output, and artifacts
 - Code review/diff check → invoke /review
 - Visual polish → invoke /design-review
 - Ship/deploy/PR → invoke /ship or /land-and-deploy
@@ -781,7 +781,7 @@ Replace `SKILL_NAME`, `OUTCOME`, and `USED_BROWSE` before running.
 
 ## Plan Status Footer
 
-Skills that run plan reviews (`/plan-*-review`, `/codex review`) include the EXIT PLAN MODE GATE blocking checklist at the end of the skill, which verifies the plan file ends with `## GSTACK REVIEW REPORT` before ExitPlanMode is called. Skills that don't run plan reviews (operational skills like `/ship`, `/qa`, `/review`) typically don't operate in plan mode and have no review report to verify; this footer is a no-op for them. Writing the plan file is the one edit allowed in plan mode.
+Skills that run plan reviews (`/plan-*-review`, `/codex review`) include the EXIT PLAN MODE GATE blocking checklist at the end of the skill, which verifies the plan file ends with `## GSTACK REVIEW REPORT` before ExitPlanMode is called. Skills that don't run plan reviews (operational skills like `/ship` and `/review`) typically don't operate in plan mode and have no review report to verify; this footer is a no-op for them. Writing the plan file is the one edit allowed in plan mode.
 
 ## Step 0: Detect platform and base branch
 
@@ -1563,7 +1563,7 @@ Using the coverage percentage from the diagram in substep 4 (the `COVERAGE: X/Y 
 
 ### Test Plan Artifact
 
-After producing the coverage diagram, write a test plan artifact so `/qa` and `/qa-only` can consume it:
+After producing the coverage diagram, write a test plan artifact for existing automated verification:
 
 ```bash
 eval "$($GSTACK_ROOT/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
@@ -1796,61 +1796,15 @@ After producing the completion checklist, evaluate in priority order:
 
 ## Step 8.1: Plan Verification
 
-Automatically verify the plan's testing/verification steps using the `/qa-only` skill.
+Verify the plan's testing and verification steps without browser tooling.
 
-### 1. Check for verification section
+1. Find the plan's verification section. If none exists, record that verification was skipped.
+2. Extract existing test, lint, type-check, build, and validation commands plus any artifact paths named by the plan.
+3. Run the existing automated verification commands in the repository. Do not launch a browser, probe or start a development server, or request screenshots.
+4. Inspect exit status, logs, command output, and generated artifacts. Record each plan item as PASS, FAIL, or SKIPPED with concrete non-browser evidence.
+5. If any item fails, use AskUserQuestion to offer fixing the failure before ship or shipping with the known issue. Cite the failing command and relevant log or artifact path.
 
-Using the plan file already discovered in Step 8, look for a verification section. Match any of these headings: `## Verification`, `## Test plan`, `## Testing`, `## How to test`, `## Manual testing`, or any section with verification-flavored items (URLs to visit, things to check visually, interactions to test).
-
-**If no verification section found:** Skip with "No verification steps found in plan — skipping auto-verification."
-**If no plan file was found in Step 8:** Skip (already handled).
-
-### 2. Check for running dev server
-
-Before invoking browse-based verification, check if a dev server is reachable:
-
-```bash
-curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 2>/dev/null || \
-curl -s -o /dev/null -w '%{http_code}' http://localhost:8080 2>/dev/null || \
-curl -s -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null || \
-curl -s -o /dev/null -w '%{http_code}' http://localhost:4000 2>/dev/null || echo "NO_SERVER"
-```
-
-**If NO_SERVER:** Skip with "No dev server detected — skipping plan verification. Run /qa separately after deploying."
-
-### 3. Invoke /qa-only inline
-
-Read the `/qa-only` skill from disk:
-
-```bash
-cat ${CLAUDE_SKILL_DIR}/../qa-only/SKILL.md
-```
-
-**If unreadable:** Skip with "Could not load /qa-only — skipping plan verification."
-
-Follow the /qa-only workflow with these modifications:
-- **Skip the preamble** (already handled by /ship)
-- **Use the plan's verification section as the primary test input** — treat each verification item as a test case
-- **Use the detected dev server URL** as the base URL
-- **Skip the fix loop** — this is report-only verification during /ship
-- **Cap at the verification items from the plan** — do not expand into general site QA
-
-### 4. Gate logic
-
-- **All verification items PASS:** Continue silently. "Plan verification: PASS."
-- **Any FAIL:** Use AskUserQuestion:
-  - Show the failures with screenshot evidence
-  - RECOMMENDATION: Choose A if failures indicate broken functionality. Choose B if cosmetic only.
-  - Options:
-    A) Fix the failures before shipping (recommended for functional issues)
-    B) Ship anyway — known issues (acceptable for cosmetic issues)
-- **No verification section / no server / unreadable skill:** Skip (non-blocking).
-
-### 5. Include in PR body
-
-Add a `## Verification Results` section to the PR body (Step 19):
-- If verification ran: summary of results (N PASS, M FAIL, K SKIPPED)
-- If skipped: reason for skipping (no plan, no server, no verification section)
+Add a `## Verification Results` section to the PR body with the commands run, PASS/FAIL/SKIPPED counts, and evidence paths.
 
 ## Prior Learnings
 

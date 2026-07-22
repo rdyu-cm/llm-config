@@ -2,7 +2,11 @@ import tomllib
 import shutil
 import tempfile
 import re
-from scripts.validate import parse_gstack_openai_metadata, validate_gstack_catalog
+from scripts.validate import (
+    find_workflow_browser_policy_violations,
+    parse_gstack_openai_metadata,
+    validate_gstack_catalog,
+)
 
 import unittest
 from pathlib import Path
@@ -108,9 +112,26 @@ class GstackCatalogTests(unittest.TestCase):
                 encoding="utf-8"
             )
             found = workflow_browser_policy_violations(text)
+            found.extend(find_workflow_browser_policy_violations(text))
             if found:
                 violations[name] = found
         self.assertEqual(violations, {})
+
+    def test_workflow_policy_rejects_only_browser_qa_routing_contexts(self) -> None:
+        unsafe = (
+            "Invoke /qa or /qa-only for site behavior.\n"
+            "Before browse-based verification, probe the dev server.\n"
+            "Show failures with screenshot evidence.\n"
+        )
+        violations = find_workflow_browser_policy_violations(unsafe)
+        self.assertTrue(any("browser-only skill routing" in item for item in violations))
+        self.assertTrue(any("browser verification" in item for item in violations))
+
+        safe = (
+            "Run quality assurance tests and inspect the browse command's logs.\n"
+            "Archive existing screenshots as evidence without launching a browser.\n"
+        )
+        self.assertEqual(find_workflow_browser_policy_violations(safe), [])
 
     def test_workflow_browser_policy_allows_browser_absence_prose(self) -> None:
         safe = (
@@ -167,6 +188,20 @@ class GstackCatalogTests(unittest.TestCase):
             self.assertIn(full_branch, full_text, name)
             self.assertIn(workflow_fallback, workflow_text, name)
             self.assertEqual(workflow_browser_policy_violations(workflow_text), [], name)
+
+    def test_ship_splits_browser_qa_from_non_browser_verification(self) -> None:
+        full = (ROOT / "generated/gstack-codex/gstack-ship/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        workflow = (
+            ROOT / "generated/gstack-codex-workflow/gstack-ship/SKILL.md"
+        ).read_text(encoding="utf-8")
+
+        for browser_branch in ("/qa-only", "browse-based verification", "screenshot evidence"):
+            self.assertIn(browser_branch, full)
+            self.assertNotIn(browser_branch, workflow)
+        self.assertIn("Run the existing automated verification commands", workflow)
+        self.assertIn("Do not launch a browser", workflow)
 
     def test_catalog_rejects_gstack_upgrade_in_full_profile(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

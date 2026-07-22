@@ -264,7 +264,7 @@ class UpdateGstackTests(unittest.TestCase):
         self.assertIn('P="$GSTACK_MAKE_PDF/pdf"', adapted)
 
     def test_adapter_rewrites_workflow_browser_fallbacks(self) -> None:
-        from scripts.update_gstack import _adapt_codex_skill
+        from scripts.update_gstack import _adapt_codex_skill, _apply_workflow_safe_fallbacks
 
         with (ROOT / "gstack-capabilities.toml").open("rb") as handle:
             workflow = tomllib.load(handle)["profiles"]["workflow"]["skills"]
@@ -305,6 +305,18 @@ class UpdateGstackTests(unittest.TestCase):
         self.assertIn("save the comparison board HTML", plan_design)
         self.assertIn("report its artifact path", plan_design)
         self.assertIn("continue the non-browser review flow", plan_design)
+
+        ship = _apply_workflow_safe_fallbacks(
+            (ROOT / "generated/gstack-codex/gstack-ship/SKILL.md").read_text(
+                encoding="utf-8"
+            ),
+            "gstack-ship",
+        )
+        self.assertNotRegex(ship, r"(?<![A-Za-z0-9_-])/qa(?:-only)?\b")
+        self.assertNotIn("browse-based verification", ship)
+        self.assertNotIn("screenshot evidence", ship)
+        self.assertIn("Run the existing automated verification commands", ship)
+        self.assertIn("Do not launch a browser", ship)
 
     def test_generation_never_executes_candidate_package_commands(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -351,6 +351,47 @@ def _adapt_codex_skill(source: str, name: str, *, workflow_safe: bool = False) -
 def _apply_workflow_safe_fallbacks(adapted: str, name: str) -> str:
     """Remove launch/setup flows from skills shared by the workflow profile."""
     adapted = adapted.replace(
+        'like /qa for "does this work?" or /investigate for bugs?',
+        "like running the project's tests for \"does this work?\" or /investigate for bugs?",
+    )
+    adapted = adapted.replace(
+        "\"There's code here — `/qa` to see it work, or `/investigate` if something's off.\"",
+        "\"There's code here — run its automated tests, or `/investigate` if something's off.\"",
+    )
+    adapted = adapted.replace(
+        '"Pick one: `/spec`, `/investigate`, or `/qa`."',
+        '"Pick one: `/spec`, `/investigate`, or `/review`."',
+    )
+    adapted = adapted.replace(
+        "- QA/testing site behavior → invoke /qa or /qa-only",
+        "- Verification → run existing automated tests and inspect logs, command output, and artifacts",
+    )
+    adapted = adapted.replace(
+        "operational skills like `/ship`, `/qa`, `/review`",
+        "operational skills like `/ship` and `/review`",
+    )
+    adapted = re.sub(
+        r"write a test plan artifact to the project directory so `(?:/qa|project tests)` "
+        r"and `(?:/qa-only|automated verification)` can consume it as primary test input:",
+        "write a test plan artifact to the project directory for existing automated "
+        "verification:",
+        adapted,
+    )
+    adapted = re.sub(
+        r"This file is consumed by `(?:/qa|project tests)` and "
+        r"`(?:/qa-only|automated verification)` as primary test input\.",
+        "Use this file as primary input for existing automated verification.",
+        adapted,
+    )
+    adapted = re.sub(
+        r"write a test plan artifact so `(?:/qa|project tests)` and "
+        r"`(?:/qa-only|automated verification)` can consume it:",
+        "write a test plan artifact for existing automated verification:",
+        adapted,
+    )
+    adapted = adapted.replace(" /qa(8)", " tests(8)")
+    adapted = adapted.replace(" project tests(8)", " tests(8)")
+    adapted = adapted.replace(
         ", writes to the plan file, and `open` for generated artifacts.",
         ", and writes to the plan file.",
     )
@@ -497,6 +538,36 @@ def _apply_workflow_safe_fallbacks(adapted: str, name: str) -> str:
             "Do not serve or launch the comparison artifact.",
             1,
         )
+    if name == "gstack-ship":
+        adapted = re.sub(
+            r"(?ms)^## Step 8\.1: Plan Verification\n.*?(?=^## Prior Learnings)",
+            "## Step 8.1: Plan Verification\n\n"
+            "Verify the plan's testing and verification steps without browser tooling.\n\n"
+            "1. Find the plan's verification section. If none exists, record that verification "
+            "was skipped.\n"
+            "2. Extract existing test, lint, type-check, build, and validation commands plus any "
+            "artifact paths named by the plan.\n"
+            "3. Run the existing automated verification commands in the repository. Do not "
+            "launch a browser, probe or start a development server, or request screenshots.\n"
+            "4. Inspect exit status, logs, command output, and generated artifacts. Record each "
+            "plan item as PASS, FAIL, or SKIPPED with concrete non-browser evidence.\n"
+            "5. If any item fails, use AskUserQuestion to offer fixing the failure before ship "
+            "or shipping with the known issue. Cite the failing command and relevant log or "
+            "artifact path.\n\n"
+            "Add a `## Verification Results` section to the PR body with the commands run, "
+            "PASS/FAIL/SKIPPED counts, and evidence paths.\n\n",
+            adapted,
+            count=1,
+        )
+
+    # Browser-only QA skills are absent from the workflow profile. Remove any exact
+    # tokens left in less-common upstream prose after the targeted guidance rewrites.
+    adapted = re.sub(
+        r"(?<![A-Za-z0-9_-])/qa-only\b", "automated verification", adapted
+    )
+    adapted = re.sub(
+        r"(?<![A-Za-z0-9_-])/qa\b", "project tests", adapted
+    )
     return adapted
 
 

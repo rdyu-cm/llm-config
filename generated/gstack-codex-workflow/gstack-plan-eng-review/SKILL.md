@@ -209,7 +209,7 @@ Skip if `TEL_PROMPTED` is `yes`.
 
 If `PROACTIVE_PROMPTED` is `no` AND `TEL_PROMPTED` is `yes`: ask once:
 
-> Let gstack proactively suggest skills, like /qa for "does this work?" or /investigate for bugs?
+> Let gstack proactively suggest skills, like running the project's tests for "does this work?" or /investigate for bugs?
 
 Options:
 - A) Keep it on (recommended)
@@ -227,7 +227,7 @@ Skip if `PROACTIVE_PROMPTED` is `yes`.
 
 ## First-run guidance (one-time)
 
-If `ACTIVATED` is `no` (first skill run on this machine) AND the preamble printed a non-empty `FIRST_TASK:` value that is NOT `nongit`: show ONE short, project-specific line mapped from the token, as a heads-up, then CONTINUE with whatever the user actually asked — do NOT halt their task. Map the token: `greenfield` → "Fresh repo — shape it first with `/spec` or `/office-hours`." `code_node`/`code_python`/`code_rust`/`code_go`/`code_ruby`/`code_ios` → "There's code here — `/qa` to see it work, or `/investigate` if something's off." `branch_ahead` → "Unshipped work on this branch — `/review` then `/ship`." `dirty_default` → "Uncommitted changes — `/review` before committing." `clean_default` → "Pick one: `/spec`, `/investigate`, or `/qa`." Then substitute the token you saw for TASK_TOKEN and run (best-effort), and mark activated:
+If `ACTIVATED` is `no` (first skill run on this machine) AND the preamble printed a non-empty `FIRST_TASK:` value that is NOT `nongit`: show ONE short, project-specific line mapped from the token, as a heads-up, then CONTINUE with whatever the user actually asked — do NOT halt their task. Map the token: `greenfield` → "Fresh repo — shape it first with `/spec` or `/office-hours`." `code_node`/`code_python`/`code_rust`/`code_go`/`code_ruby`/`code_ios` → "There's code here — run its automated tests, or `/investigate` if something's off." `branch_ahead` → "Unshipped work on this branch — `/review` then `/ship`." `dirty_default` → "Uncommitted changes — `/review` before committing." `clean_default` → "Pick one: `/spec`, `/investigate`, or `/review`." Then substitute the token you saw for TASK_TOKEN and run (best-effort), and mark activated:
 ```bash
 $GSTACK_BIN/gstack-telemetry-log --event-type first_task_scaffold_shown --skill "TASK_TOKEN" --outcome shown 2>/dev/null || true
 touch ~/.gstack/.activated 2>/dev/null || true
@@ -269,7 +269,7 @@ Key routing rules:
 - Design system/plan review → invoke /design-consultation or /plan-design-review
 - Full review pipeline → invoke /autoplan
 - Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
+- Verification → run existing automated tests and inspect logs, command output, and artifacts
 - Code review/diff check → invoke /review
 - Visual polish → invoke /design-review
 - Ship/deploy/PR → invoke /ship or /land-and-deploy
@@ -783,7 +783,7 @@ Replace `SKILL_NAME`, `OUTCOME`, and `USED_BROWSE` before running.
 
 ## Plan Status Footer
 
-Skills that run plan reviews (`/plan-*-review`, `/codex review`) include the EXIT PLAN MODE GATE blocking checklist at the end of the skill, which verifies the plan file ends with `## GSTACK REVIEW REPORT` before ExitPlanMode is called. Skills that don't run plan reviews (operational skills like `/ship`, `/qa`, `/review`) typically don't operate in plan mode and have no review report to verify; this footer is a no-op for them. Writing the plan file is the one edit allowed in plan mode.
+Skills that run plan reviews (`/plan-*-review`, `/codex review`) include the EXIT PLAN MODE GATE blocking checklist at the end of the skill, which verifies the plan file ends with `## GSTACK REVIEW REPORT` before ExitPlanMode is called. Skills that don't run plan reviews (operational skills like `/ship` and `/review`) typically don't operate in plan mode and have no review report to verify; this footer is a no-op for them. Writing the plan file is the one edit allowed in plan mode.
 
 
 
@@ -1241,7 +1241,7 @@ The plan should be complete enough that when implementation begins, every test i
 
 ### Test Plan Artifact
 
-After producing the coverage diagram, write a test plan artifact to the project directory so `/qa` and `/qa-only` can consume it as primary test input:
+After producing the coverage diagram, write a test plan artifact to the project directory for existing automated verification:
 
 ```bash
 eval "$($GSTACK_ROOT/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
@@ -1270,7 +1270,7 @@ Repo: {owner/repo}
 - {end-to-end flow that must work}
 ```
 
-This file is consumed by `/qa` and `/qa-only` as primary test input. Include only the information that helps a QA tester know **what to test and where** — not implementation details.
+Use this file as primary input for existing automated verification. Include only the information that helps a QA tester know **what to test and where** — not implementation details.
 
 For LLM/prompt changes: check the "Prompt/LLM changes" file patterns listed in CLAUDE.md. If this plan touches ANY of those patterns, state which eval suites must be run, which cases should be added, and what baselines to compare against. Then use AskUserQuestion to confirm the eval scope with the user.
 

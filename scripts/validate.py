@@ -113,6 +113,14 @@ def find_workflow_browser_policy_violations(text: str) -> list[str]:
         r"\b(?:board|browser tab)\b[^.\n]{0,60}\b(?:open|opened)\b"
     )
     open_authorization = re.compile(r"(?i)`open`\s+(?:for|\(fallback|is allowed)|fallback for viewing boards")
+    browser_only_skill = re.compile(r"(?<![A-Za-z0-9_-])/qa(?:-only)?\b", re.IGNORECASE)
+    browser_verification = re.compile(
+        r"(?i)\bbrowse-based verification\b|\bscreenshot evidence\b"
+    )
+    dev_server_probe = re.compile(
+        r"(?i)check for (?:a )?running dev server|dev server is reachable|"
+        r"curl[^\n]*https?://(?:localhost|127\.0\.0\.1)(?::\d+)?"
+    )
     for line_number, line in enumerate(text.splitlines(), 1):
         reasons: list[str] = []
         if launch_command.search(line) or re.search(r"(?i)run\s+`(?:open|xdg-open)`", line):
@@ -127,6 +135,10 @@ def find_workflow_browser_policy_violations(text: str) -> list[str]:
             reasons.append("setup guidance")
         if open_authorization.search(line):
             reasons.append("open authorization")
+        if browser_only_skill.search(line):
+            reasons.append("browser-only skill routing")
+        if browser_verification.search(line) or dev_server_probe.search(line):
+            reasons.append("browser verification")
         negative_browser_absence = re.search(
             r"(?i)\b(?:do not|don't|never|without|skip|not available|non-browser)\b", line
         )

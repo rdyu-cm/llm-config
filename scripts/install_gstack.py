@@ -32,8 +32,24 @@ def desired_links(root: Path, home: Path, mode: str) -> dict[Path, Path]:
     return links
 
 
+def _lexists(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def _parent_conflicts(home: Path, target: Path) -> list[Path]:
+    conflicts: list[Path] = []
+    current = home
+    for part in target.parent.relative_to(home).parts:
+        current /= part
+        if not _lexists(current):
+            break
+        if current.is_symlink() or not current.is_dir():
+            conflicts.append(current)
+    return conflicts
+
+
 def _load_state(path: Path) -> tuple[dict, bytes | None]:
-    if not path.exists():
+    if not _lexists(path):
         return {"version": 1, "links": {}}, None
     raw = path.read_bytes()
     state = json.loads(raw)
@@ -69,16 +85,26 @@ def install(root: Path, home: Path, mode: str, apply: bool) -> list[str]:
     home = home.resolve()
     desired = {target: source.resolve() for target, source in desired_links(root, home, mode).items()}
     state_path = home / STATE_RELATIVE
-    state, previous_state = _load_state(state_path)
-    recorded = {Path(target): source for target, source in state["links"].items()}
     messages: list[str] = []
 
     for target in desired:
-        if (target.exists() or target.is_symlink()) and not _matches_recorded_link(target, recorded.get(target, "")):
-            messages.append(f"conflict: {target}")
+        for parent in _parent_conflicts(home, target):
+            messages.append(f"conflict: {parent}")
+    for parent in _parent_conflicts(home, state_path):
+        messages.append(f"conflict: {parent}")
+    if _lexists(state_path) and (state_path.is_symlink() or not state_path.is_file()):
+        messages.append(f"conflict: {state_path}")
     temporary = state_path.with_name(f"{state_path.name}.tmp")
-    if temporary.exists() or temporary.is_symlink():
+    if _lexists(temporary):
         messages.append(f"conflict: {temporary}")
+    if messages:
+        return messages
+
+    state, previous_state = _load_state(state_path)
+    recorded = {Path(target): source for target, source in state["links"].items()}
+    for target in desired:
+        if _lexists(target) and not _matches_recorded_link(target, recorded.get(target, "")):
+            messages.append(f"conflict: {target}")
     if messages:
         return messages
 
@@ -89,6 +115,7 @@ def install(root: Path, home: Path, mode: str, apply: bool) -> list[str]:
 
     created: list[Path] = []
     replaced: list[tuple[Path, str]] = []
+    removed: list[tuple[Path, str]] = []
     try:
         for target, source in desired.items():
             if target.is_symlink() and _matches_recorded_link(target, recorded.get(target, "")) and target.resolve() == source:
@@ -103,6 +130,7 @@ def install(root: Path, home: Path, mode: str, apply: bool) -> list[str]:
 
         for target, source in recorded.items():
             if target not in desired and _matches_recorded_link(target, source):
+                removed.append((target, source))
                 target.unlink()
                 messages.append(f"removed {target}")
 
@@ -118,6 +146,9 @@ def install(root: Path, home: Path, mode: str, apply: bool) -> list[str]:
                 target.unlink()
         for target, source in replaced:
             target.symlink_to(source, target_is_directory=Path(source).is_dir())
+        for target, source in removed:
+            if not _lexists(target):
+                target.symlink_to(source, target_is_directory=Path(source).is_dir())
         _restore_state(state_path, previous_state)
         raise
     return messages

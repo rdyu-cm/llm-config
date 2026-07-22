@@ -26,6 +26,18 @@ class GstackVendorTests(unittest.TestCase):
     def test_vendor_does_not_contain_nested_git_metadata(self) -> None:
         self.assertFalse((ROOT / "vendor" / "gstack" / ".git").exists())
 
+    def test_validator_requires_global_discover_entrypoint(self) -> None:
+        with (ROOT / "sources.lock.toml").open("rb") as handle:
+            lock = tomllib.load(handle)
+        entrypoint = ROOT / "vendor/gstack/bin/gstack-global-discover.ts"
+        missing_entrypoint = entrypoint.with_suffix(".missing")
+        entrypoint.rename(missing_entrypoint)
+        try:
+            with self.assertRaisesRegex(ValueError, "gstack-global-discover.ts"):
+                validate_gstack_vendor(ROOT, lock)
+        finally:
+            missing_entrypoint.rename(entrypoint)
+
 
 if __name__ == "__main__":
     unittest.main()

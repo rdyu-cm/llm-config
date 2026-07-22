@@ -54,7 +54,7 @@ def validate_gstack_vendor(root: Path, lock: dict) -> None:
     if source is None:
         fail("sources.lock.toml is missing gstack")
     vendor = root / "vendor" / "gstack"
-    required = ("LICENSE", "setup", "package.json", "hosts/codex.ts")
+    required = ("LICENSE", "setup", "package.json", "hosts/codex.ts", "bin/gstack-global-discover.ts")
     for relative in required:
         if not (vendor / relative).is_file():
             fail(f"vendor/gstack is missing {relative}")

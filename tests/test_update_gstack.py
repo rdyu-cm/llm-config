@@ -220,6 +220,28 @@ class UpdateGstackTests(unittest.TestCase):
 
             _validate_generated_tree(ROOT, generated)
 
+    def test_adapter_normalizes_and_initializes_runtime_paths(self) -> None:
+        from scripts.update_gstack import _adapt_codex_skill
+
+        source = (
+            "---\nname: test\ndescription: Runtime path fixture. (gstack)\n---\n"
+            "## Preamble (run first)\n\n```bash\n"
+            'B="$HOME$GSTACK_BROWSE/browse"\n'
+            'D="$HOME$GSTACK_DESIGN/design"\n'
+            'P="$HOME$GSTACK_MAKE_PDF/pdf"\n'
+            "```\n"
+        )
+
+        adapted = _adapt_codex_skill(source, "gstack-test")
+
+        self.assertNotIn("$HOME$GSTACK_", adapted)
+        self.assertIn('GSTACK_BROWSE="$GSTACK_ROOT/browse/dist"', adapted)
+        self.assertIn('GSTACK_DESIGN="$GSTACK_ROOT/design/dist"', adapted)
+        self.assertIn('GSTACK_MAKE_PDF="$GSTACK_ROOT/make-pdf"', adapted)
+        self.assertIn('B="$GSTACK_BROWSE/browse"', adapted)
+        self.assertIn('D="$GSTACK_DESIGN/design"', adapted)
+        self.assertIn('P="$GSTACK_MAKE_PDF/pdf"', adapted)
+
     def test_generation_never_executes_candidate_package_commands(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -300,6 +322,24 @@ class UpdateGstackTests(unittest.TestCase):
             skill = staged / "gstack-test/SKILL.md"
             skill.write_text(skill.read_text(encoding="utf-8") + ".claude/skills/bad\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "Claude path"):
+                _validate_generated_tree(root, staged)
+
+            skill.write_text(
+                "---\nname: gstack-test\ndescription: test\n---\n"
+                "GSTACK_ROOT=x\nGSTACK_BIN=x\nGSTACK_BROWSE=x\n"
+                'B="$HOME$GSTACK_BROWSE/browse"\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "doubled home prefix"):
+                _validate_generated_tree(root, staged)
+
+            skill.write_text(
+                "---\nname: gstack-test\ndescription: test\n---\n"
+                "GSTACK_ROOT=x\nGSTACK_BIN=x\n"
+                'B="$GSTACK_BROWSE/browse"\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "GSTACK_BROWSE.*without initialization"):
                 _validate_generated_tree(root, staged)
 
             skill.write_text(

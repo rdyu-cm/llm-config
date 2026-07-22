@@ -1,6 +1,7 @@
 import tomllib
 import shutil
 import tempfile
+import re
 from scripts.validate import parse_gstack_openai_metadata, validate_gstack_catalog
 
 import unittest
@@ -16,9 +17,42 @@ BROWSER_SKILLS = {
     "gstack-pair-agent", "gstack-qa", "gstack-qa-only", "gstack-scrape",
     "gstack-setup-browser-cookies", "gstack-skillify",
 }
+RUNTIME_SKILLS = {
+    "GSTACK_BROWSE": {
+        "gstack-benchmark", "gstack-browse", "gstack-canary", "gstack-design-consultation",
+        "gstack-design-html", "gstack-design-review", "gstack-design-shotgun",
+        "gstack-devex-review", "gstack-land-and-deploy", "gstack-office-hours",
+        "gstack-open-gstack-browser", "gstack-pair-agent", "gstack-plan-design-review",
+        "gstack-qa", "gstack-qa-only", "gstack-setup-browser-cookies",
+    },
+    "GSTACK_DESIGN": {
+        "gstack-design-consultation", "gstack-design-html", "gstack-design-review",
+        "gstack-design-shotgun", "gstack-office-hours", "gstack-plan-design-review",
+    },
+    "GSTACK_MAKE_PDF": {"gstack-make-pdf"},
+}
 
 
 class GstackCatalogTests(unittest.TestCase):
+    def test_generated_runtime_paths_are_initialized_and_resolved(self) -> None:
+        generated = ROOT / "generated/gstack-codex"
+        texts = {
+            path.parent.name: path.read_text(encoding="utf-8")
+            for path in generated.glob("gstack-*/SKILL.md")
+        }
+        for name, text in texts.items():
+            self.assertNotIn("$HOME$GSTACK_", text, name)
+
+        for variable, expected_skills in RUNTIME_SKILLS.items():
+            used_by = {
+                name
+                for name, text in texts.items()
+                if re.search(rf"\$(?:\{{)?{variable}(?:\}})?", text)
+            }
+            self.assertEqual(used_by, expected_skills, variable)
+            for name in expected_skills:
+                self.assertRegex(texts[name], rf"(?m)^{variable}=", name)
+
     def test_workflow_catalog_excludes_browser_capabilities(self) -> None:
         with (ROOT / "gstack-capabilities.toml").open("rb") as handle:
             catalog = tomllib.load(handle)

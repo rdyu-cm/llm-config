@@ -781,7 +781,7 @@ visual brainstorming, not a review process.
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 D=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/.agents/skills/gstack/design/dist/design" ] && D="$_ROOT/.agents/skills/gstack/design/dist/design"
-[ -z "$D" ] && D="$HOME$GSTACK_DESIGN/design"
+[ -z "$D" ] && D="$GSTACK_DESIGN/design"
 if [ -x "$D" ]; then
   echo "DESIGN_READY: $D"
 else
@@ -789,7 +789,7 @@ else
 fi
 B=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/.agents/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.agents/skills/gstack/browse/dist/browse"
-[ -z "$B" ] && B="$HOME$GSTACK_BROWSE/browse"
+[ -z "$B" ] && B="$GSTACK_BROWSE/browse"
 if [ -x "$B" ]; then
   echo "BROWSE_READY: $B"
 else

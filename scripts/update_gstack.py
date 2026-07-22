@@ -25,6 +25,7 @@ UPDATE_PATHS = (
     "generated/gstack-codex",
     "sources.lock.toml",
 )
+RUNTIME_PATH_VARIABLES = ("GSTACK_BROWSE", "GSTACK_DESIGN", "GSTACK_MAKE_PDF")
 
 
 def validate_candidate(candidate: str) -> None:
@@ -169,6 +170,15 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
             raise ValueError(f"generated gstack skill name does not match: {name}")
         if re.search(r"(?:~?/)?\.claude/skills", frontmatter):
             raise ValueError(f"generated gstack skill contains a Claude path: {name}")
+        if "$HOME$GSTACK_" in frontmatter:
+            raise ValueError(f"generated gstack skill contains a doubled home prefix: {name}")
+        for variable in RUNTIME_PATH_VARIABLES:
+            if re.search(rf"\$(?:\{{)?{variable}(?:\}})?", frontmatter) and re.search(
+                rf"(?m)^{variable}=", frontmatter
+            ) is None:
+                raise ValueError(
+                    f"generated gstack skill uses {variable} without initialization: {name}"
+                )
         trusted_skill = root / "generated/gstack-codex" / name / "SKILL.md"
         if trusted_skill.is_file() and not trusted_skill.is_symlink():
             trusted_text = trusted_skill.read_text(encoding="utf-8")
@@ -247,10 +257,15 @@ def _adapt_codex_skill(source: str, name: str) -> str:
         'GSTACK_BROWSE="$GSTACK_ROOT/browse/dist"\n'
         'GSTACK_DESIGN="$GSTACK_ROOT/design/dist"\n'
     )
+    if "$GSTACK_MAKE_PDF" in body:
+        initialization += 'GSTACK_MAKE_PDF="$GSTACK_ROOT/make-pdf"\n'
     if preamble in body and "GSTACK_ROOT=" not in body:
         body = body.replace(preamble, preamble + initialization, 1)
     adapted = f"---\nname: {name}\n{description}\n---\n{body}"
     for old, new in (
+        ("$HOME$GSTACK_BROWSE", "$GSTACK_BROWSE"),
+        ("$HOME$GSTACK_DESIGN", "$GSTACK_DESIGN"),
+        ("$HOME$GSTACK_MAKE_PDF", "$GSTACK_MAKE_PDF"),
         ("~/.claude/skills/gstack", "$GSTACK_ROOT"),
         (".claude/skills/gstack", ".agents/skills/gstack"),
         (".claude/skills/review", ".agents/skills/gstack/review"),

@@ -20,6 +20,7 @@ GSTACK_ROOT="$HOME/.codex/skills/gstack"
 GSTACK_BIN="$GSTACK_ROOT/bin"
 GSTACK_BROWSE="$GSTACK_ROOT/browse/dist"
 GSTACK_DESIGN="$GSTACK_ROOT/design/dist"
+GSTACK_MAKE_PDF="$GSTACK_ROOT/make-pdf"
 _UPD=$($GSTACK_BIN/gstack-update-check 2>/dev/null || .agents/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD" || true
 mkdir -p ~/.gstack/sessions
@@ -138,7 +139,7 @@ _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 P=""
 [ -n "$MAKE_PDF_BIN" ] && [ -x "$MAKE_PDF_BIN" ] && P="$MAKE_PDF_BIN"
 [ -z "$P" ] && [ -n "$_ROOT" ] && [ -x "$_ROOT/.agents/skills/gstack/make-pdf/dist/pdf" ] && P="$_ROOT/.agents/skills/gstack/make-pdf/dist/pdf"
-[ -z "$P" ] && P="$HOME$GSTACK_MAKE_PDF/pdf"
+[ -z "$P" ] && P="$GSTACK_MAKE_PDF/pdf"
 if [ -x "$P" ]; then
   echo "MAKE_PDF_READY: $P"
   alias _p_="$P"   # shellcheck alias helper (not exported)

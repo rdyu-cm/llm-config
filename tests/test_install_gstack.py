@@ -129,5 +129,18 @@ class InstallGstackTests(unittest.TestCase):
             self.assertTrue(any("conflict" in line for line in messages))
             self.assertFalse((home / ".codex/gstack-managed.json").exists())
 
+    def test_failed_first_state_replace_removes_temporary_for_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            temporary = home / ".codex/gstack-managed.json.tmp"
+
+            with patch.object(Path, "replace", side_effect=OSError("replace failed")):
+                with self.assertRaisesRegex(OSError, "replace failed"):
+                    install(ROOT, home, "workflow", True)
+
+            self.assertFalse(temporary.exists())
+            install(ROOT, home, "workflow", True)
+            self.assertTrue((home / ".codex/gstack-managed.json").is_file())
+
 if __name__ == "__main__":
     unittest.main()

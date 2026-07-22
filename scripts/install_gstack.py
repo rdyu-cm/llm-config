@@ -65,7 +65,11 @@ def _matches_recorded_link(target: Path, source: str) -> bool:
 def _write_state(path: Path, state: dict) -> None:
     temporary = path.with_name(f"{path.name}.tmp")
     temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    try:
+        temporary.replace(path)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def _restore_state(path: Path, previous: bytes | None) -> None:

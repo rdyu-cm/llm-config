@@ -138,7 +138,20 @@ class DoctorTests(unittest.TestCase):
             result = self.run_doctor(home)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("gstack managed state invalid", result.stderr)
+        self.assertIn("invalid managed state", result.stderr)
+
+    def test_rejects_non_object_gstack_managed_state(self) -> None:
+        for raw in ("[]", "0"):
+            with self.subTest(raw=raw), tempfile.TemporaryDirectory() as directory:
+                home = Path(directory) / "home"
+                state = home / ".codex" / "gstack-managed.json"
+                state.parent.mkdir(parents=True)
+                state.write_text(raw, encoding="utf-8")
+                result = self.run_doctor(home)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("invalid managed state", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
 
     def test_rejects_incomplete_full_gstack_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

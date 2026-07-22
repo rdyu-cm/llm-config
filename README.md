@@ -174,10 +174,7 @@ Gstack is vendored at the commit recorded in `sources.lock.toml`; its upstream p
 ```
 
 Use `workflow` on a cluster: it installs the planning, review, debugging, security, documentation, and shipping skills, without Chromium or browser QA. Use `full` on a local VM with browser dependencies; after the frozen dependency install and gstack build, bootstrap runs Bun's pinned-project `playwright install chromium` command for that mode only. When Bun is needed, bootstrap uses the pinned, checksum-verified installer recorded in the gstack catalog.
-/update-gstack.sh` to prepare/c
-Startup checks for a newer upstream commit at most once every 24 hours. Set `CODEX_CONFIG_UPDATE_CHECK=0` to disable that notice. Run `./scripts/update-gstack.sh --check` to check immediately and `./scripts/update-gstack.sh` to prepare an uncommitted vendor update for review. The updater immediately replaces this repository's `vendor/gstack` and `generated/gstack-codex` working-tree files, but never commits or installs them; review `git diff` before committing or running bootstrap.
-
-Startup checks for a newer upstream commit at most once every 24 hours. Set `CODEX_CONFIG_UPDATE_CHECK=0` to disable that notice. Run `./scripts/update-gstack.sh --check` to check immediately and `./scripts/update-gstack.sh` to prepare an uncommitted vendor update for review; the updater does not commit or replace code without review.
+Startup checks for a newer upstream commit at most once every 24 hours. Set `CODEX_CONFIG_UPDATE_CHECK=0` to disable that notice. Run `./scripts/update-gstack.sh --check` to check immediately and `./scripts/update-gstack.sh` to prepare an uncommitted vendor update for review. The updater immediately replaces this repository's `vendor/gstack` and `generated/gstack-codex` working-tree files. Because installed links target those paths, an already installed environment may see candidate content immediately. It never commits: review `git diff` and commit or revert the update before relying on it; consider preparing updates in a clean worktree.
 
 Browser authentication and remote access remain explicit: invoke `/gstack-setup-browser-cookies` to import browser cookies, or `/gstack-pair-agent` to pair another agent. Both require the `full` profile and user action; neither is part of bootstrap or doctor.
 

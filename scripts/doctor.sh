@@ -81,7 +81,7 @@ fi
 GSTACK_STATE="$HOME/.codex/gstack-managed.json"
 if [ -e "$GSTACK_STATE" ] || [ -L "$GSTACK_STATE" ]; then
   if [ -L "$GSTACK_STATE" ] || [ ! -f "$GSTACK_STATE" ]; then
-    echo "gstack managed state invalid" >&2
+    echo "invalid managed state" >&2
     failures=$((failures + 1))
   elif [ -z "$PYTHON" ]; then
     echo "gstack managed state cannot be checked without Python 3.11+" >&2
@@ -95,6 +95,8 @@ from pathlib import Path
 state_path, root, home = map(Path, sys.argv[1:])
 try:
     state = json.loads(state_path.read_text(encoding="utf-8"))
+    if not isinstance(state, dict):
+        raise ValueError("state root is not an object")
     mode = state.get("mode")
     if state.get("version") != 1 or mode not in {"off", "workflow", "full"}:
         raise ValueError("invalid version or mode")
@@ -106,8 +108,8 @@ try:
         raise ValueError("invalid links")
     with (root / "gstack-capabilities.toml").open("rb") as handle:
         catalog = tomllib.load(handle)
-except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as error:
-    print(f"gstack managed state invalid: {error}", file=sys.stderr)
+except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError, tomllib.TOMLDecodeError):
+    print("invalid managed state", file=sys.stderr)
     raise SystemExit(1)
 
 expected = {}
@@ -128,8 +130,6 @@ if mode != "off":
             runtime / "browse": root / "vendor" / "gstack" / "browse",
             runtime / "qa": root / "vendor" / "gstack" / "qa",
         })
-
-recorded = {Path(target): Path(source) for target, source in links.items()}
 mismatches = []
 if set(links) != {str(target) for target in expected}:
     mismatches.extend(sorted(set(links) ^ {str(target) for target in expected}))

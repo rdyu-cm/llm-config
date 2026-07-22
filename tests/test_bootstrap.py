@@ -38,6 +38,31 @@ class PortableSkillInventoryTests(unittest.TestCase):
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_gstack_modes_are_accepted_in_dry_run(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+
+            for mode in ("off", "workflow", "full"):
+                result = subprocess.run(
+                    ["bash", str(ROOT / "scripts/bootstrap.sh"), "--dry-run", f"--gstack={mode}"],
+                    env={**os.environ, "HOME": str(home), "PYTHON": sys.executable},
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"gstack mode: {mode}", result.stdout)
+
+    def test_invalid_gstack_mode_exits_with_usage_error(self) -> None:
+        result = subprocess.run(
+            ["bash", str(ROOT / "scripts/bootstrap.sh"), "--gstack=invalid"],
+            env={**os.environ, "PYTHON": sys.executable},
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 2)
+
     def test_apply_creates_codex_directory_in_clean_home(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = Path(directory) / "fixture"
@@ -61,6 +86,8 @@ class BootstrapTests(unittest.TestCase):
             fake_npx.chmod(0o755)
             shutil.copy(ROOT / "scripts" / "bootstrap.sh", fixture / "scripts" / "bootstrap.sh")
             shutil.copy(ROOT / "scripts" / "sync_config.py", fixture / "scripts" / "sync_config.py")
+            shutil.copy(ROOT / "scripts" / "prepare_gstack.py", fixture / "scripts" / "prepare_gstack.py")
+            shutil.copy(ROOT / "scripts" / "install_gstack.py", fixture / "scripts" / "install_gstack.py")
             (fixture / ".codex" / "config.toml").write_text(
                 'sandbox_mode = "workspace-write"\n', encoding="utf-8"
             )
@@ -133,6 +160,8 @@ class BootstrapTests(unittest.TestCase):
             (home / ".codex").mkdir(parents=True)
             shutil.copy(ROOT / "scripts" / "bootstrap.sh", fixture / "scripts" / "bootstrap.sh")
             shutil.copy(ROOT / "scripts" / "sync_config.py", fixture / "scripts" / "sync_config.py")
+            shutil.copy(ROOT / "scripts" / "prepare_gstack.py", fixture / "scripts" / "prepare_gstack.py")
+            shutil.copy(ROOT / "scripts" / "install_gstack.py", fixture / "scripts" / "install_gstack.py")
             (fixture / ".codex" / "config.toml").write_text("invalid =\n", encoding="utf-8")
             active = home / ".codex" / "config.toml"
             active.write_text('model = "cluster-model"\n', encoding="utf-8")

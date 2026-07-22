@@ -14,12 +14,26 @@ class PrepareGstackTests(unittest.TestCase):
     def test_off_does_not_require_bun(self) -> None:
         self.assertEqual(prepare(ROOT, "off", True, {"PATH": ""}), [])
 
-    def test_workflow_apply_requires_no_bun_or_subprocess(self) -> None:
-        with patch("scripts.prepare_gstack.find_bun") as find_bun, \
+    def test_workflow_missing_bun_installs_verified_binary_without_vendor_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            installer = Path(directory) / "bun-install"
+            installer.write_text("installer", encoding="utf-8")
+            with patch("scripts.prepare_gstack.find_bun", side_effect=[None, Path("/fake/bun")]), \
+                 patch("scripts.prepare_gstack.download_installer", return_value=installer) as download, \
+                 patch("scripts.prepare_gstack.verify_sha256") as verify, \
+                 patch("scripts.prepare_gstack.run_bun_installer") as install_bun, \
+                 patch("scripts.prepare_gstack.subprocess.run") as run:
+                self.assertEqual(prepare(ROOT, "workflow", True, {"PATH": "", "HOME": directory}), ["ready   gstack workflow"])
+        download.assert_called_once()
+        verify.assert_called_once()
+        install_bun.assert_called_once()
+        run.assert_not_called()
+
+    def test_workflow_existing_bun_runs_no_vendor_commands(self) -> None:
+        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
              patch("scripts.prepare_gstack.download_installer") as download, \
              patch("scripts.prepare_gstack.subprocess.run") as run:
             self.assertEqual(prepare(ROOT, "workflow", True, {"PATH": ""}), ["ready   gstack workflow"])
-        find_bun.assert_not_called()
         download.assert_not_called()
         run.assert_not_called()
 

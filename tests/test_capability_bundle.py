@@ -55,6 +55,16 @@ class CapabilityBundleTests(unittest.TestCase):
         for item in catalog["components"]:
             self.assertTrue((ROOT / item["path"]).exists(), item)
 
+    def test_catalog_registers_gstack_source_and_generated_skills(self):
+        with (ROOT / "capability-bundle.toml").open("rb") as handle:
+            bundle = tomllib.load(handle)
+
+        components = {item["name"]: item for item in bundle["components"]}
+        self.assertEqual(components["gstack-source"]["path"], "vendor/gstack")
+        self.assertEqual(
+            components["gstack-codex-skills"]["path"],
+            "generated/gstack-codex",
+        )
     def test_catalog_includes_every_discovered_skill(self):
         with (ROOT / "capability-bundle.toml").open("rb") as handle:
             catalog = tomllib.load(handle)

@@ -78,6 +78,50 @@ else
   failures=$((failures + 1))
 fi
 
+GSTACK_STATE="$HOME/.codex/gstack-managed.json"
+if [ -e "$GSTACK_STATE" ]; then
+  if [ -L "$GSTACK_STATE" ] || [ ! -f "$GSTACK_STATE" ]; then
+    echo "gstack managed state invalid" >&2
+    failures=$((failures + 1))
+  elif [ -z "$PYTHON" ]; then
+    echo "gstack managed state cannot be checked without Python 3.11+" >&2
+    failures=$((failures + 1))
+  elif "$PYTHON" -c '
+import json
+import sys
+from pathlib import Path
+
+state_path = Path(sys.argv[1])
+try:
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    if state.get("version") != 1 or state.get("mode") not in {"workflow", "full"}:
+        raise ValueError("invalid version or mode")
+    links = state.get("links")
+    if not isinstance(links, dict) or not all(
+        isinstance(target, str) and isinstance(source, str)
+        for target, source in links.items()
+    ):
+        raise ValueError("invalid links")
+except (OSError, ValueError, json.JSONDecodeError) as error:
+    print(f"gstack managed state invalid: {error}", file=sys.stderr)
+    raise SystemExit(1)
+
+mismatches = [
+    target
+    for target, source in links.items()
+    if not Path(target).is_symlink() or Path(target).resolve() != Path(source).resolve()
+]
+for target in mismatches:
+    print(f"gstack managed link mismatch: {target}", file=sys.stderr)
+raise SystemExit(bool(mismatches))
+' "$GSTACK_STATE"; then
+    mode=$("$PYTHON" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["mode"])' "$GSTACK_STATE")
+    echo "ok      gstack $mode"
+  else
+    failures=$((failures + 1))
+  fi
+fi
+
 if [ -n "${GITHUB_PAT_TOKEN:-}" ]; then
   echo "ok      GITHUB_PAT_TOKEN is set (value not inspected)"
 else

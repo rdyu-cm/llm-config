@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,5 +32,61 @@ class PrepareGstackTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "checksum"):
                 prepare(ROOT, "workflow", True, {"PATH": ""})
 
+    def test_verified_installer_runs_before_frozen_install(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            installer = Path(directory) / "bun-install"
+            installer.write_text("installer", encoding="utf-8")
+            events: list[str] = []
+            with patch("scripts.prepare_gstack.find_bun", side_effect=[None, Path("/fake/bun")]), \
+                 patch("scripts.prepare_gstack.download_installer", return_value=installer), \
+                 patch("scripts.prepare_gstack.verify_sha256", side_effect=lambda *_: events.append("verify")), \
+                 patch("scripts.prepare_gstack.run_bun_installer", side_effect=lambda *_: events.append("installer")), \
+                 patch("scripts.prepare_gstack.subprocess.run", side_effect=lambda *_args, **_kwargs: events.append("install")):
+                prepare(ROOT, "workflow", True, {"PATH": "", "HOME": directory})
+            self.assertEqual(events, ["verify", "installer", "install"])
+
+    def test_full_installs_before_build(self) -> None:
+        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+             patch("scripts.prepare_gstack.subprocess.run") as run:
+            prepare(ROOT, "full", True, {"PATH": ""})
+        self.assertEqual([call.args[0][1] for call in run.call_args_list], ["install", "run"])
+        self.assertEqual(run.call_args_list[0].args[0][-2:], ["install", "--frozen-lockfile"])
+        self.assertEqual(run.call_args_list[1].args[0], ["/fake/bun", "run", "build"])
+
+    def test_installer_is_removed_after_checksum_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            installer = Path(directory) / "bun-install"
+            installer.write_text("unexpected", encoding="utf-8")
+            with patch("scripts.prepare_gstack.find_bun", return_value=None), \
+                 patch("scripts.prepare_gstack.download_installer", return_value=installer):
+                with self.assertRaisesRegex(ValueError, "checksum"):
+                    prepare(ROOT, "workflow", True, {"PATH": ""})
+            self.assertFalse(installer.exists())
+
+    def test_installer_is_removed_after_execution_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            installer = Path(directory) / "bun-install"
+            installer.write_text("installer", encoding="utf-8")
+            with patch("scripts.prepare_gstack.find_bun", return_value=None), \
+                 patch("scripts.prepare_gstack.download_installer", return_value=installer), \
+                 patch("scripts.prepare_gstack.verify_sha256"), \
+                 patch("scripts.prepare_gstack.run_bun_installer", side_effect=RuntimeError("install failed")):
+                with self.assertRaisesRegex(RuntimeError, "install failed"):
+                    prepare(ROOT, "workflow", True, {"PATH": ""})
+            self.assertFalse(installer.exists())
+
+    def test_bun_rediscovery_uses_supplied_home(self) -> None:
+        observed_paths: list[str] = []
+        def find(env: dict[str, str]) -> Path | None:
+            observed_paths.append(env.get("PATH", ""))
+            return None if len(observed_paths) == 1 else Path("/fake/bun")
+        with tempfile.TemporaryDirectory() as directory, \
+             patch("scripts.prepare_gstack.find_bun", side_effect=find), \
+             patch("scripts.prepare_gstack.download_installer", return_value=Path(directory) / "bun-install"), \
+             patch("scripts.prepare_gstack.verify_sha256"), \
+             patch("scripts.prepare_gstack.run_bun_installer"), \
+             patch("scripts.prepare_gstack.subprocess.run"):
+            prepare(ROOT, "workflow", True, {"PATH": "/original", "HOME": directory})
+        self.assertTrue(observed_paths[1].startswith(f"{Path(directory) / '.bun/bin'}{os.pathsep}"))
 if __name__ == "__main__":
     unittest.main()

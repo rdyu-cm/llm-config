@@ -53,9 +53,16 @@ def prepare(root: Path, mode: str, apply: bool, env: dict[str, str]) -> list[str
         if not apply:
             return [f"would   install Bun {catalog['bun']['version']}"]
         installer = download_installer()
-        verify_sha256(installer, catalog["bun"]["installer_sha256"])
-        run_bun_installer(installer, catalog["bun"]["version"], env)
-        installed_path = f"{Path.home() / '.bun/bin'}{os.pathsep}{env.get('PATH', '')}"
+        try:
+            verify_sha256(installer, catalog["bun"]["installer_sha256"])
+            run_bun_installer(installer, catalog["bun"]["version"], env)
+        finally:
+            try:
+                installer.unlink(missing_ok=True)
+            except OSError:
+                pass
+        bun_home = Path(env.get("HOME") or Path.home())
+        installed_path = f"{bun_home / '.bun/bin'}{os.pathsep}{env.get('PATH', '')}"
         bun = find_bun(env | {"PATH": installed_path})
         if bun is None:
             raise RuntimeError("Bun installation completed but bun is unavailable")

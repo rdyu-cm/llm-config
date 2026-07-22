@@ -38,6 +38,95 @@ class PortableSkillInventoryTests(unittest.TestCase):
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_gstack_flags_accept_unordered_permutations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+            for args in (("--gstack=workflow", "--dry-run"), ("--dry-run", "--gstack=full")):
+                result = subprocess.run(
+                    ["bash", str(ROOT / "scripts/bootstrap.sh"), *args],
+                    env={**os.environ, "HOME": str(home), "PYTHON": sys.executable},
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_bootstrap_rejects_duplicate_actions_gstack_flags_and_unknown_options(self) -> None:
+        for args in (("--dry-run", "--apply"), ("--gstack=off", "--gstack=workflow"), ("--unknown",)):
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/bootstrap.sh"), *args],
+                env={**os.environ, "PYTHON": sys.executable},
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+
+    def test_dry_run_does_not_invoke_bun_curl_or_npx(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            fake_bin = Path(directory) / "bin"
+            command_log = Path(directory) / "commands.log"
+            home.mkdir()
+            fake_bin.mkdir()
+            for command in ("bun", "curl", "npx"):
+                executable = fake_bin / command
+                executable.write_text(
+                    "#!/usr/bin/env bash\n"
+                    'printf "%s\\n" "$0" >> "$COMMAND_LOG"\n'
+                    "exit 99\n",
+                    encoding="utf-8",
+                )
+                executable.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/bootstrap.sh"), "--dry-run", "--gstack=full"],
+                env={**os.environ, "HOME": str(home), "PYTHON": sys.executable, "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}", "COMMAND_LOG": str(command_log)},
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(command_log.exists())
+    def test_gstack_prepare_and_install_failures_propagate_and_dry_run_omits_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / "fixture"
+            home = Path(directory) / "home"
+            logs = Path(directory) / "logs"
+            (fixture / "scripts").mkdir(parents=True)
+            home.mkdir()
+            logs.mkdir()
+            shutil.copy(ROOT / "scripts" / "bootstrap.sh", fixture / "scripts" / "bootstrap.sh")
+            for name in ("prepare_gstack.py", "install_gstack.py"):
+                (fixture / "scripts" / name).write_text(
+                    "import os, sys\n"
+                    "from pathlib import Path\n"
+                    "name = Path(sys.argv[0]).stem\n"
+                    "Path(os.environ['LOG_DIR'], name).write_text(' '.join(sys.argv[1:]))\n"
+                    "raise SystemExit(41 if os.environ.get('FAIL_' + name.upper()) else 0)\n",
+                    encoding="utf-8",
+                )
+            base_env = {**os.environ, "HOME": str(home), "PYTHON": sys.executable, "LOG_DIR": str(logs)}
+            result = subprocess.run(
+                ["bash", str(fixture / "scripts" / "bootstrap.sh"), "--dry-run", "--gstack=workflow"],
+                env=base_env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn("--apply", (logs / "prepare_gstack").read_text())
+            self.assertNotIn("--apply", (logs / "install_gstack").read_text())
+            result = subprocess.run(
+                ["bash", str(fixture / "scripts" / "bootstrap.sh"), "--dry-run"],
+                env={**base_env, "FAIL_PREPARE_GSTACK": "1"},
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 41)
+            result = subprocess.run(
+                ["bash", str(fixture / "scripts" / "bootstrap.sh"), "--dry-run"],
+                env={**base_env, "FAIL_INSTALL_GSTACK": "1"},
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 41)
     def test_gstack_modes_are_accepted_in_dry_run(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"

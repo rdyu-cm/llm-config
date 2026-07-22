@@ -165,6 +165,12 @@ class UpdateGstackTests(unittest.TestCase):
                 "Pre-landing PR review with candidate fidelity. (gstack)",
                 1,
             )
+            source = source.replace(
+                "## When to invoke this skill",
+                'Literal generator examples: `${{ github.ref }}` and `{{"status":"ok"}}`.\n\n'
+                "## When to invoke this skill",
+                1,
+            )
             (candidate / "review/SKILL.md").write_text(source, encoding="utf-8")
 
             generate_codex_skills(ROOT, candidate, generated)
@@ -177,6 +183,12 @@ class UpdateGstackTests(unittest.TestCase):
             self.assertNotIn(".claude/skills", adapted)
             self.assertNotIn("Review Army — Specialist Dispatch", adapted)
             self.assertNotIn("Adversarial review (always-on)", adapted)
+            self.assertIn("${{ github.ref }}", adapted)
+            self.assertIn('{{"status":"ok"}}', adapted)
+
+            from scripts.update_gstack import _validate_generated_tree
+
+            _validate_generated_tree(ROOT, generated)
 
     def test_generation_never_executes_candidate_package_commands(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -265,6 +277,25 @@ class UpdateGstackTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "GSTACK_ROOT"):
                 _validate_generated_tree(root, staged)
+
+    def test_staged_validator_accepts_full_known_good_golden_tree(self) -> None:
+        from scripts.update_gstack import _validate_generated_tree
+
+        _validate_generated_tree(ROOT, ROOT / "generated/gstack-codex")
+
+    def test_staged_validator_rejects_generator_placeholder_token(self) -> None:
+        from scripts.update_gstack import _validate_generated_tree
+
+        with tempfile.TemporaryDirectory() as directory:
+            generated = Path(directory) / "gstack-codex"
+            shutil.copytree(ROOT / "generated/gstack-codex", generated)
+            skill = generated / "gstack-review/SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8") + "\n{{PREAMBLE}}\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "unresolved template"):
+                _validate_generated_tree(ROOT, generated)
 
     def test_replace_directory_restores_old_tree_when_install_rename_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

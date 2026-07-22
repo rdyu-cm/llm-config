@@ -147,7 +147,7 @@ def _validate_generated_tree(root: Path, generated: Path) -> None:
                     raise ValueError(
                         f"generated gstack skill is missing {initialization.rstrip('=')}: {name}"
                     )
-        if "{{" in frontmatter or "}}" in frontmatter:
+        if re.search(r"(?<!\$)\{\{[A-Z_][A-Z0-9_]*(?::[^}\n]+)?\}\}", frontmatter):
             raise ValueError(f"generated gstack skill contains an unresolved template: {name}")
         metadata_text = metadata.read_text(encoding="utf-8")
         expected_metadata = (

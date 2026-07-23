@@ -52,6 +52,26 @@ def host_platform() -> tuple[str, str, str, str]:
     return platform.system().lower(), platform.machine().lower(), values.get("ID", ""), values.get("VERSION_ID", "")
 
 
+def chromium_executable(bun: Path, root: Path, env: dict[str, str]) -> Path:
+    result = subprocess.run([str(bun), "--eval", "import { chromium } from 'playwright'; console.log(chromium.executablePath())"], cwd=root / "vendor/gstack", env=env, check=True, capture_output=True, text=True)
+    executable = Path(result.stdout.strip())
+    if not executable.is_file():
+        raise RuntimeError("gstack browser host prerequisites missing: Chromium executable cannot be resolved")
+    return executable
+
+
+def ldd_output(executable: Path) -> str:
+    return subprocess.run(["ldd", str(executable)], check=True, capture_output=True, text=True).stdout
+
+
+def validate_browser_host_prerequisites(bun: Path, root: Path, env: dict[str, str]) -> None:
+    if host_platform()[0] != "linux":
+        return
+    missing = [line.split("=>", 1)[0].strip() for line in ldd_output(chromium_executable(bun, root, env)).splitlines() if "=> not found" in line]
+    if missing:
+        raise RuntimeError("gstack browser host prerequisites missing: " + ", ".join(missing) + ". Run `bun x playwright install-deps chromium` manually (may require sudo).")
+
+
 def prepare(root: Path, mode: str, apply: bool, env: dict[str, str]) -> list[str]:
     if mode not in {"off", "workflow", "full"}:
         raise ValueError(f"invalid gstack mode: {mode}")
@@ -100,6 +120,7 @@ def prepare(root: Path, mode: str, apply: bool, env: dict[str, str]) -> list[str
         env=browser_env,
         check=True,
     )
+    validate_browser_host_prerequisites(bun, root, browser_env)
     return messages + [f"ready   gstack {mode}"]
 
 

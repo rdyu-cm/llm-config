@@ -11,6 +11,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PrepareGstackTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.host_platform = patch("scripts.prepare_gstack.host_platform", return_value=("darwin", "arm64", "", ""))
+        self.host_platform.start()
+        self.validation = patch("scripts.prepare_gstack.validate_browser_host_prerequisites")
+        self.validation.start()
+
+    def tearDown(self) -> None:
+        self.validation.stop()
+        self.host_platform.stop()
+
     def test_off_does_not_require_bun(self) -> None:
         self.assertEqual(prepare(ROOT, "off", True, {"PATH": ""}), [])
 
@@ -55,6 +65,31 @@ class PrepareGstackTests(unittest.TestCase):
                  patch("scripts.prepare_gstack.subprocess.run") as run:
                 prepare(ROOT, "full", True, {"PATH": ""})
             self.assertNotIn("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", run.call_args_list[-1].kwargs["env"])
+    def test_full_linux_missing_browser_libraries_fails_with_manual_remediation(self) -> None:
+        self.validation.stop()
+        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+             patch("scripts.prepare_gstack.host_platform", return_value=("linux", "x86_64", "ubuntu", "24.04")), \
+             patch("scripts.prepare_gstack.chromium_executable", return_value=Path("/fake/chromium")), \
+             patch("scripts.prepare_gstack.ldd_output", return_value="libnss3.so => not found\nlibatk-1.0.so.0 => not found\n"), \
+             patch("scripts.prepare_gstack.subprocess.run") as run:
+            with self.assertRaisesRegex(RuntimeError, "gstack browser host prerequisites missing.*libnss3.so"):
+                prepare(ROOT, "full", True, {"PATH": ""})
+        self.assertFalse(any("install-deps" in call.args[0] or "sudo" in call.args[0] for call in run.call_args_list))
+
+    def test_full_linux_clean_ldd_succeeds_and_non_linux_skips_check(self) -> None:
+        self.validation.stop()
+        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+             patch("scripts.prepare_gstack.host_platform", return_value=("linux", "x86_64", "ubuntu", "24.04")), \
+             patch("scripts.prepare_gstack.chromium_executable", return_value=Path("/fake/chromium")), \
+             patch("scripts.prepare_gstack.ldd_output", return_value="linux-vdso.so.1\n"), \
+             patch("scripts.prepare_gstack.subprocess.run"):
+            self.assertEqual(prepare(ROOT, "full", True, {"PATH": ""}), ["ready   gstack full"])
+        with patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+             patch("scripts.prepare_gstack.host_platform", return_value=("darwin", "arm64", "", "")), \
+             patch("scripts.prepare_gstack.chromium_executable") as executable, \
+             patch("scripts.prepare_gstack.subprocess.run"):
+            prepare(ROOT, "full", True, {"PATH": ""})
+        executable.assert_not_called()
     def test_checksum_mismatch_stops_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory, \
              patch("scripts.prepare_gstack.find_bun", return_value=None), \

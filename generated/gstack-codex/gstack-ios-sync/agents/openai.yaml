@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-ios-sync"
-  short_description: "Use the $gstack-ios-sync workflow."
-  default_prompt: "Invoke $gstack-ios-sync for this task."
-policy:
-  allow_implicit_invocation: true

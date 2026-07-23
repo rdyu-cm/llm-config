@@ -158,26 +158,6 @@ Hooks are not a complete security boundary. Codex also requires explicit trust f
 
 The update check compares every pinned commit with upstream `HEAD` and exits nonzero when review is needed. It never replaces installed code. Review upstream changes and licenses, reinstall the selected paths with the Codex skill installer, run `./scripts/doctor.sh`, then update `sources.lock.toml`.
 
-## Gstack workflow
-
-Gstack is vendored at the commit recorded in `sources.lock.toml`; its upstream provenance and MIT license remain in `vendor/gstack` and `vendor/gstack/LICENSE`. Personal skills and the Terra/Sol-pinned agents above remain separate from this pristine upstream snapshot.
-
-```bash
-# Existing portable config only
-./scripts/bootstrap.sh --apply --gstack=off
-
-# Cluster: planning, review, debugging, security, docs, and shipping; no browser
-./scripts/bootstrap.sh --apply --gstack=workflow
-
-# Local VM: complete gstack including Chromium-backed browser and QA
-./scripts/bootstrap.sh --apply --gstack=full
-```
-
-Use `workflow` on a cluster: it links the 28 browser-free skills from `generated/gstack-codex-workflow`. Use `full` on a local VM: it links the complete browser-capable bundle from `generated/gstack-codex`; after the frozen dependency install and gstack build, bootstrap runs Bun's pinned-project `playwright install chromium` command for that mode only. When Bun is needed, bootstrap uses the pinned, checksum-verified installer recorded in the gstack catalog. On Linux, full mode validates Chromium shared-library prerequisites after installation; if libraries are missing, install them manually from the vendored project with `cd vendor/gstack && bun x playwright install-deps chromium` (this may require sudo). On Ubuntu 26.04 x86_64, use `cd vendor/gstack && env PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 bun x playwright install-deps chromium` instead. Bootstrap never runs either command automatically.
-Startup checks for a newer upstream commit at most once every 24 hours. Set `CODEX_CONFIG_UPDATE_CHECK=0` to disable that notice. Run `./scripts/update-gstack.sh --check` to check immediately and `./scripts/update-gstack.sh` to prepare an uncommitted vendor update for review. The updater immediately replaces this repository's `vendor/gstack` and both profile-specific generated bundles. Because installed links target those paths, an already installed environment may see candidate content immediately. It never commits: review `git diff` and commit or revert the update before relying on it; consider preparing updates in a clean worktree.
-
-Browser authentication and remote access remain explicit: invoke `/gstack-setup-browser-cookies` to import browser cookies, or `/gstack-pair-agent` to pair another agent. Both require the `full` profile and user action; neither is part of bootstrap or doctor.
-
 ## Secrets and generated state
 
 Keep credentials in environment variables or a local ignored `.env`. Do not add Codex authentication state, transcripts, MCP OAuth data, Codebase Memory indexes, caches, browser output, or local overrides to this repository.

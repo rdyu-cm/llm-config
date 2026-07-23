@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-qa-only"
-  short_description: "Use the $gstack-qa-only workflow."
-  default_prompt: "Invoke $gstack-qa-only for this task."
-policy:
-  allow_implicit_invocation: true

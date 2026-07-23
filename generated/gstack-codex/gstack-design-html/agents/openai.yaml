@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-design-html"
-  short_description: "Use the $gstack-design-html workflow."
-  default_prompt: "Invoke $gstack-design-html for this task."
-policy:
-  allow_implicit_invocation: true

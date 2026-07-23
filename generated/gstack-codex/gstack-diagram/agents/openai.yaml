@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-diagram"
-  short_description: "Use the $gstack-diagram workflow."
-  default_prompt: "Invoke $gstack-diagram for this task."
-policy:
-  allow_implicit_invocation: true

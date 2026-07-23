@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-investigate"
-  short_description: "Use the $gstack-investigate workflow."
-  default_prompt: "Invoke $gstack-investigate for this task."
-policy:
-  allow_implicit_invocation: true

@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-unfreeze"
-  short_description: "Use the $gstack-unfreeze workflow."
-  default_prompt: "Invoke $gstack-unfreeze for this task."
-policy:
-  allow_implicit_invocation: true

@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-scrape"
-  short_description: "Use the $gstack-scrape workflow."
-  default_prompt: "Invoke $gstack-scrape for this task."
-policy:
-  allow_implicit_invocation: true

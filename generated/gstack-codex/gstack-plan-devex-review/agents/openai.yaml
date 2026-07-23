@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-plan-devex-review"
-  short_description: "Use the $gstack-plan-devex-review workflow."
-  default_prompt: "Invoke $gstack-plan-devex-review for this task."
-policy:
-  allow_implicit_invocation: true

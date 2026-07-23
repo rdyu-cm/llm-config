@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-make-pdf"
-  short_description: "Use the $gstack-make-pdf workflow."
-  default_prompt: "Invoke $gstack-make-pdf for this task."
-policy:
-  allow_implicit_invocation: true

@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-open-gstack-browser"
-  short_description: "Use the $gstack-open-gstack-browser workflow."
-  default_prompt: "Invoke $gstack-open-gstack-browser for this task."
-policy:
-  allow_implicit_invocation: true

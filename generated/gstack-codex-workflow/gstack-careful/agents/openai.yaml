@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-careful"
-  short_description: "Use the $gstack-careful workflow."
-  default_prompt: "Invoke $gstack-careful for this task."
-policy:
-  allow_implicit_invocation: true

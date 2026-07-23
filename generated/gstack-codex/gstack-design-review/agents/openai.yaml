@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-design-review"
-  short_description: "Use the $gstack-design-review workflow."
-  default_prompt: "Invoke $gstack-design-review for this task."
-policy:
-  allow_implicit_invocation: true

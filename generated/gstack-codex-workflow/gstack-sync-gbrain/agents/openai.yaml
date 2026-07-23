@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-sync-gbrain"
-  short_description: "Use the $gstack-sync-gbrain workflow."
-  default_prompt: "Invoke $gstack-sync-gbrain for this task."
-policy:
-  allow_implicit_invocation: true

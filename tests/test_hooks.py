@@ -7,7 +7,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -61,31 +60,6 @@ class SecretGuardTests(unittest.TestCase):
 
 
 class SessionContextTests(unittest.TestCase):
-    def test_includes_changed_gstack_update_notice(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            output = run_hook(
-                "session_context.py",
-                "",
-                environment={
-                    "GSTACK_REMOTE_HEAD": "84be2f97c4190000000000000000000000000000",
-                    "XDG_CACHE_HOME": directory,
-                },
-            )
-
-        self.assertIn("update  gstack:", output["hookSpecificOutput"]["additionalContext"])
-
-    def test_omits_gstack_update_notice_when_opted_out(self) -> None:
-        output = run_hook(
-            "session_context.py",
-            "",
-            environment={
-                "CODEX_CONFIG_UPDATE_CHECK": "0",
-                "GSTACK_REMOTE_HEAD": "84be2f97c4190000000000000000000000000000",
-            },
-        )
-
-        self.assertNotIn("update  gstack:", output["hookSpecificOutput"]["additionalContext"])
-
     def test_describes_codebase_memory_without_profile_specific_inference(self) -> None:
         output = run_hook("session_context.py", "")
         context = output["hookSpecificOutput"]["additionalContext"]

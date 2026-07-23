@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-landing-report"
-  short_description: "Use the $gstack-landing-report workflow."
-  default_prompt: "Invoke $gstack-landing-report for this task."
-policy:
-  allow_implicit_invocation: true

@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-design-shotgun"
-  short_description: "Use the $gstack-design-shotgun workflow."
-  default_prompt: "Invoke $gstack-design-shotgun for this task."
-policy:
-  allow_implicit_invocation: true

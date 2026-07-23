@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-skillify"
-  short_description: "Use the $gstack-skillify workflow."
-  default_prompt: "Invoke $gstack-skillify for this task."
-policy:
-  allow_implicit_invocation: true

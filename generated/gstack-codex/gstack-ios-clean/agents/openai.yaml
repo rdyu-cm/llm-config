@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-ios-clean"
-  short_description: "Use the $gstack-ios-clean workflow."
-  default_prompt: "Invoke $gstack-ios-clean for this task."
-policy:
-  allow_implicit_invocation: true

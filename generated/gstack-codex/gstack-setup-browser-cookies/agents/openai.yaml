@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-setup-browser-cookies"
-  short_description: "Use the $gstack-setup-browser-cookies workflow."
-  default_prompt: "Invoke $gstack-setup-browser-cookies for this task."
-policy:
-  allow_implicit_invocation: true

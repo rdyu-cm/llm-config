@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-plan-eng-review"
-  short_description: "Use the $gstack-plan-eng-review workflow."
-  default_prompt: "Invoke $gstack-plan-eng-review for this task."
-policy:
-  allow_implicit_invocation: true

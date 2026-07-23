@@ -56,10 +56,3 @@ repository = "https://github.com/DeusData/codebase-memory-mcp"
 commit = "2469ecc3a7a2f80debe296e1f17a1efcfdb9450c"
 license = "MIT"
 items = ["npm:codebase-memory-mcp@0.8.1"]
-
-[[sources]]
-name = "gstack"
-repository = "https://github.com/garrytan/gstack"
-commit = "a3259400a366593e0c909dd9ac3e59752efd2488"
-license = "MIT (vendor/gstack/LICENSE)"
-items = ["vendored-source", "generated-codex-skills", "workflow", "browser-runtime"]

@@ -2,7 +2,7 @@
 
 An audited, repository-contained Codex setup for implementation, planning, debugging, review, frontend work, browser automation, and security analysis.
 
-The repository is the source of truth. `scripts/bootstrap.sh` links it into Codex's global discovery paths without copying secrets or silently discarding an existing setup. On first install, an existing `~/.codex/config.toml` becomes the machine-local overlay at `~/.codex/config.local.toml`. The tracked portable base overrides matching local keys, and the generated merged file stays ignored by Git.
+The repository is the source of truth. `scripts/bootstrap.sh` links it into Codex's global discovery paths without copying secrets or silently discarding an existing setup. On first install, an existing `~/.codex/config.toml` becomes the machine-local overlay at `~/.codex/config.local.toml`. The tracked portable base overrides matching local keys, and bootstrap installs the merged result as a regular global config file so Codex can safely persist runtime state without writing through a repository symlink.
 
 ## Quick start
 
@@ -28,7 +28,7 @@ Restart Codex after applying the bootstrap. Open `/hooks` once to review and tru
 - `skills/`: canonical, vendored skill library.
 - `.agents/skills`: repo-local discovery link to `skills/`.
 - `.codex/config.toml`: tracked portable defaults and MCP definitions.
-- `.codex/config.generated.toml`: ignored merged output used by Codex after bootstrap.
+- `.codex/config.generated.toml`: ignored merged snapshot copied to Codex's global config during bootstrap.
 - `.codex/agents/`: narrow custom agents and Superpowers model tiers.
 - `.codex/hooks.json` and `.codex/hooks/`: deterministic lifecycle guardrails.
 - `profiles/`: minimal, frontend, security, and full configuration overlays.
@@ -182,7 +182,7 @@ Browser authentication and remote access remain explicit: invoke `/gstack-setup-
 
 Keep credentials in environment variables or a local ignored `.env`. Do not add Codex authentication state, transcripts, MCP OAuth data, Codebase Memory indexes, caches, browser output, or local overrides to this repository.
 
-Machine-specific model choices, project trust entries, and TUI state belong in `~/.codex/config.local.toml`. Codex-owned hook trust hashes remain in the ignored generated config and are preserved when it is regenerated. Re-run `./scripts/bootstrap.sh --apply` after pulling portable config changes; it regenerates the ignored merged config. Portable values win when both layers define the same key.
+Machine-specific model choices, project trust entries, and TUI state belong in `~/.codex/config.local.toml`. Codex-owned hook trust hashes remain in the installed global config and are preserved when it is regenerated. Re-run `./scripts/bootstrap.sh --apply` after pulling portable config changes; it refreshes the ignored merged snapshot and atomically installs a regular `~/.codex/config.toml`. Existing managed symlinks are migrated automatically. Portable values win when both layers define the same key.
 
 ## License
 

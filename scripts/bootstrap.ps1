@@ -81,8 +81,16 @@ function Install-MergedConfig {
 }
 
 $CodexHome = Join-Path $HOME ".codex"
-Link-ItemSafely (Join-Path $Root "AGENTS.global.md") (Join-Path $CodexHome "AGENTS.md")
 Install-MergedConfig $CodexHome
+$cleanup = Join-Path $Root "scripts/cleanup_legacy_gstack.py"
+if ($Apply) {
+    & $Python $cleanup --home $HOME --apply
+} else {
+    & $Python $cleanup --home $HOME
+}
+if ($LASTEXITCODE -ne 0) { throw "Legacy cleanup failed; no discovery links were changed." }
+
+Link-ItemSafely (Join-Path $Root "AGENTS.global.md") (Join-Path $CodexHome "AGENTS.md")
 Link-ItemSafely (Join-Path $Root ".codex/hooks.json") (Join-Path $CodexHome "hooks.json")
 Link-ItemSafely (Join-Path $Root ".codex/hooks") (Join-Path $CodexHome "hooks")
 Link-ItemSafely (Join-Path $Root ".codex/agents") (Join-Path $CodexHome "agents")

@@ -6,9 +6,7 @@ APPLY=false
 conflicts=0
 LOCAL_CONFIG="$HOME/.codex/config.local.toml"
 GENERATED_CONFIG="$ROOT/.codex/config.generated.toml"
-GSTACK_MODE=off
 action_seen=false
-gstack_seen=false
 
 find_python() {
   for candidate in "${PYTHON:-}" python3 "$HOME"/.local/share/uv/python/cpython-3.*/bin/python3; do
@@ -28,7 +26,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --dry-run)
       if [ "$action_seen" = true ]; then
-        echo "usage: scripts/bootstrap.sh [--dry-run|--apply] [--gstack=off|workflow|full]" >&2
+        echo "usage: scripts/bootstrap.sh [--dry-run|--apply]" >&2
         exit 2
       fi
       action_seen=true
@@ -36,22 +34,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --apply)
       if [ "$action_seen" = true ]; then
-        echo "usage: scripts/bootstrap.sh [--dry-run|--apply] [--gstack=off|workflow|full]" >&2
+        echo "usage: scripts/bootstrap.sh [--dry-run|--apply]" >&2
         exit 2
       fi
       action_seen=true
       APPLY=true
       ;;
-    --gstack=off|--gstack=workflow|--gstack=full)
-      if [ "$gstack_seen" = true ]; then
-        echo "usage: scripts/bootstrap.sh [--dry-run|--apply] [--gstack=off|workflow|full]" >&2
-        exit 2
-      fi
-      gstack_seen=true
-      GSTACK_MODE=${1#--gstack=}
-      ;;
     *)
-      echo "usage: scripts/bootstrap.sh [--dry-run|--apply] [--gstack=off|workflow|full]" >&2
+      echo "usage: scripts/bootstrap.sh [--dry-run|--apply]" >&2
       exit 2
       ;;
   esac
@@ -154,20 +144,22 @@ if [ "$APPLY" = true ]; then
 else
   echo "Portable Codex bootstrap (dry-run)"
 fi
-echo "gstack mode: $GSTACK_MODE"
-if [ "$APPLY" = true ]; then
-  "$PYTHON" "$ROOT/scripts/prepare_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE" --apply
-else
-  "$PYTHON" "$ROOT/scripts/prepare_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE"
-fi
-
-
 if ! install_config; then
   echo "Config installation failed; no discovery links were changed." >&2
   exit 1
 fi
 if ! prewarm_codebase_memory; then
   echo "Codebase Memory prewarm failed; no discovery links were changed." >&2
+  exit 1
+fi
+
+if [ "$APPLY" = true ]; then
+  if ! "$PYTHON" "$ROOT/scripts/cleanup_legacy_gstack.py" --home "$HOME" --apply; then
+    echo "Legacy cleanup failed; no discovery links were changed." >&2
+    exit 1
+  fi
+elif ! "$PYTHON" "$ROOT/scripts/cleanup_legacy_gstack.py" --home "$HOME"; then
+  echo "Legacy cleanup failed; no discovery links were changed." >&2
   exit 1
 fi
 
@@ -186,16 +178,6 @@ if [ "$conflicts" -ne 0 ]; then
   exit 1
 fi
 
-if [ "$APPLY" = true ]; then
-  "$PYTHON" "$ROOT/scripts/install_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE" --apply
-else
-  "$PYTHON" "$ROOT/scripts/install_gstack.py" --root "$ROOT" --mode "$GSTACK_MODE"
-fi
-
 if [ "$APPLY" = false ]; then
   echo "Dry-run only. Re-run with --apply after resolving any conflicts."
-fi
-
-if [ "${CODEX_CONFIG_UPDATE_CHECK:-1}" != "0" ]; then
-  "$PYTHON" "$ROOT/scripts/gstack_updates.py" --notify --force || true
 fi

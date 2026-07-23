@@ -158,6 +158,18 @@ path = "skills/writing-plans"
 classification = "supported"
 
 [[components]]
+name = "explain-as-you-go"
+kind = "skill"
+path = "skills/explain-as-you-go"
+classification = "supported"
+
+[[components]]
+name = "project-health"
+kind = "skill"
+path = "skills/project-health"
+classification = "supported"
+
+[[components]]
 name = "browser_debugger"
 kind = "agent"
 path = ".codex/agents/browser-debugger.toml"

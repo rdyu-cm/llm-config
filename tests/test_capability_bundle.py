@@ -81,6 +81,51 @@ class CapabilityBundleTests(unittest.TestCase):
         }
         self.assertEqual(cataloged, discovered)
 
+    def test_catalog_registers_lean_learning_and_health_skills(self):
+        with (ROOT / "capability-bundle.toml").open("rb") as handle:
+            catalog = tomllib.load(handle)
+
+        skills = {
+            item["name"]: item
+            for item in catalog["components"]
+            if item["kind"] == "skill"
+        }
+        self.assertEqual(
+            skills["explain-as-you-go"]["path"],
+            "skills/explain-as-you-go",
+        )
+        self.assertEqual(
+            skills["project-health"]["path"],
+            "skills/project-health",
+        )
+
+    def test_explain_as_you_go_covers_learning_and_scientific_work(self):
+        text = (ROOT / "skills/explain-as-you-go/SKILL.md").read_text(encoding="utf-8")
+
+        for requirement in (
+            "brief",
+            "guided",
+            "tutorial",
+            "units",
+            "numerical assumptions",
+            "falsif",
+            "opt-in",
+        ):
+            self.assertIn(requirement, text.lower())
+
+    def test_project_health_is_read_only_until_fixes_are_requested(self):
+        text = (ROOT / "skills/project-health/SKILL.md").read_text(encoding="utf-8").lower()
+
+        for requirement in (
+            "project's own",
+            "formatter",
+            "linter",
+            "type checker",
+            "read-only",
+            "separately requests fixes",
+        ):
+            self.assertIn(requirement, text)
+
     def test_every_custom_agent_is_registered_in_base_config(self):
         with (ROOT / ".codex/config.toml").open("rb") as handle:
             base = tomllib.load(handle)

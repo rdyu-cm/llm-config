@@ -16,3 +16,20 @@ Keep changes small, evidence-driven, and directly tied to the request.
 
 Keep vendored gstack prompts intact. When a gstack skill says to use the Agent tool with a general-purpose subagent, use Codex `spawn_agent`, preserve the upstream subtask prompt verbatim, and select the narrowest role: `explorer` for read-only discovery; `implementer_fast` or `implementer` for small writes; `implementer_standard` for multi-file integration; `implementer_deep` for broad design-sensitive implementation; `reviewer_standard` or `reviewer_deep` for correctness review; `security_reviewer` for security review; and `default` only when no narrow role fits. Do not set Terra as the unnamed global default. Existing agent files remain authoritative for model and reasoning effort.
 
+## Planning skill routing
+
+Route planning skills by intent instead of running overlapping workflows by default.
+
+- Use `gstack-office-hours` for new product ideas, unclear user needs, demand validation, positioning, or deciding whether something is worth building. Carry its conclusions into later design work without repeating discovery.
+- Use `brainstorming` when a change has material product, architecture, interface, or behavior choices. It is the design and approval gate for those changes, but is not required for diagnostics, mechanical edits, narrowly scoped bug fixes, or execution of an already approved specification.
+- Use `gstack-spec` when the requested output is an issue, ticket, or backlog item.
+- Use `writing-plans` for an approved design that requires multi-step implementation.
+- Use `gstack-autoplan` only when the user requests the complete automatic review gauntlet. Use an individual `gstack-plan-*` reviewer when explicitly requested or when its documented trigger clearly matches the plan. For example, suggest or invoke `gstack-plan-ceo-review` when scope or ambition is genuinely in question. Plan review is not automatic merely because a plan exists.
+
+Explicit user instructions can select a narrower or more rigorous route.
+
+## Worktree-first changes
+
+Start tasks that will modify tracked repository files in an isolated Git worktree unless already in one, the user explicitly requests in-place work, the repository is not Git-based, or worktree creation is unavailable. If isolation is unavailable, report that limitation before editing in place.
+
+Do not edit `main` directly. Verify work in the isolated worktree and obtain explicit approval before merging locally. After approval, merge, rerun relevant verification on the merged result, and only then remove the worktree and feature branch.

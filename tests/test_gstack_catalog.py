@@ -242,6 +242,12 @@ class GstackCatalogTests(unittest.TestCase):
         self.assertIn("implementer_standard", policy)
         self.assertIn("security_reviewer", policy)
         self.assertIn("preserve the upstream subtask prompt verbatim", policy)
+        self.assertIn("## Planning skill routing", policy)
+        self.assertIn("material product, architecture, interface, or behavior choices", policy)
+        self.assertIn("not required for diagnostics, mechanical edits", policy)
+        self.assertIn("not automatic merely because a plan exists", policy)
+        self.assertIn("## Worktree-first changes", policy)
+        self.assertIn("explicit approval before merging", policy)
 
 
 if __name__ == "__main__":

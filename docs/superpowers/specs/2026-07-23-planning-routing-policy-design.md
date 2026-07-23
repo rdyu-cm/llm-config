@@ -6,15 +6,17 @@ Eliminate ambiguity between personal planning skills and gstack planning skills,
 
 ## Planning precedence
 
-Use the following sequence for implementation work:
+Route planning work by intent:
 
-1. `gstack-office-hours` is optional product discovery for new ideas, demand validation, positioning, and deciding whether something is worth building. Its output becomes input to the normal design process; it does not replace that process.
-2. `brainstorming` is the mandatory design and approval gate before modifying repository behavior.
-3. `writing-plans` is the authoritative implementation-plan generator after the design is approved.
-4. `gstack-autoplan` or selected `gstack-plan-*` skills review an existing implementation plan after `writing-plans`; they do not replace the design or plan generators.
-5. `gstack-spec` is reserved for issue, ticket, and backlog-item requests. It is not the default implementation-planning path.
+1. Use `gstack-office-hours` for new product ideas, unclear user needs, demand validation, positioning, or deciding whether something is worth building. Its conclusions can seed a later design without repeating discovery.
+2. Use `brainstorming` when a change has material product, architecture, interface, or behavior choices. It remains the design and approval gate for those changes, but is not required for diagnostics, mechanical edits, narrowly scoped bug fixes, or execution of an already approved specification.
+3. Use `gstack-spec` when the requested output is an issue, ticket, or backlog item. It is not the default implementation-planning path.
+4. Use `writing-plans` for approved designs that require multi-step implementation. It is the authoritative implementation-plan generator.
+5. Use `gstack-autoplan` when the user requests the complete automatic review gauntlet. Use an individual `gstack-plan-*` reviewer when the user requests it or when its documented trigger clearly matches the plan. Reviews refine an existing plan; they do not replace discovery, design, or plan generation.
 
-This keeps every skill useful while assigning one owner to each planning stage. Explicit user instructions can select a narrower route, but implementation work still observes the mandatory design gate.
+For example, `gstack-plan-ceo-review` may be suggested or invoked when the user questions a plan's scope or ambition, or the plan is visibly under-ambitious. It is not a mandatory review for every plan. Likewise, `gstack-autoplan` is not automatic merely because a plan exists.
+
+This keeps every skill useful while assigning one owner to each planning stage and avoids running overlapping workflows by default. Explicit user instructions can select a narrower or more rigorous route.
 
 ## Worktree-first changes
 

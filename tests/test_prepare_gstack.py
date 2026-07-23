@@ -90,6 +90,21 @@ class PrepareGstackTests(unittest.TestCase):
              patch("scripts.prepare_gstack.subprocess.run"):
             prepare(ROOT, "full", True, {"PATH": ""})
         executable.assert_not_called()
+    def test_missing_library_diagnostic_uses_vendor_scoped_host_specific_command(self) -> None:
+        self.validation.stop()
+        cases = (
+            (("linux", "x86_64", "ubuntu", "26.04"), "cd vendor/gstack && env PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 bun x playwright install-deps chromium"),
+            (("linux", "x86_64", "ubuntu", "24.04"), "cd vendor/gstack && bun x playwright install-deps chromium"),
+        )
+        for platform_info, command in cases:
+            with self.subTest(platform_info=platform_info), \
+                 patch("scripts.prepare_gstack.host_platform", return_value=platform_info), \
+                 patch("scripts.prepare_gstack.find_bun", return_value=Path("/fake/bun")), \
+                 patch("scripts.prepare_gstack.subprocess.run"), \
+                 patch("scripts.prepare_gstack.chromium_executable", return_value=Path("/fake/chromium")), \
+                 patch("scripts.prepare_gstack.ldd_output", return_value="libnss3.so => not found\n"):
+                with self.assertRaisesRegex(RuntimeError, command):
+                    prepare(ROOT, "full", True, {"PATH": ""})
     def test_checksum_mismatch_stops_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory, \
              patch("scripts.prepare_gstack.find_bun", return_value=None), \

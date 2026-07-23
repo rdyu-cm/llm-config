@@ -69,7 +69,10 @@ def validate_browser_host_prerequisites(bun: Path, root: Path, env: dict[str, st
         return
     missing = [line.split("=>", 1)[0].strip() for line in ldd_output(chromium_executable(bun, root, env)).splitlines() if "=> not found" in line]
     if missing:
-        raise RuntimeError("gstack browser host prerequisites missing: " + ", ".join(missing) + ". Run `bun x playwright install-deps chromium` manually (may require sudo).")
+        command = "cd vendor/gstack && bun x playwright install-deps chromium"
+        if host_platform() == ("linux", "x86_64", "ubuntu", "26.04"):
+            command = "cd vendor/gstack && env PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 bun x playwright install-deps chromium"
+        raise RuntimeError("gstack browser host prerequisites missing: " + ", ".join(missing) + ". Run `" + command + "` manually (may require sudo).")
 
 
 def prepare(root: Path, mode: str, apply: bool, env: dict[str, str]) -> list[str]:

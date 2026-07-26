@@ -19,7 +19,7 @@ Spawn two parallel sub-agents whenever a sub-agent/Task tool is exposed: one for
 **Sub-agent B (mechanical pre-scan)**: run the bundled detector scoped to type:
 
 ```bash
-node .agents/skills/impeccable/scripts/detect.mjs --json --scope type [target files or dirs]
+node $HOME/.claude/skills/impeccable/scripts/detect.mjs --json --scope type [target files or dirs]
 ```
 
 A missing `node` on PATH is not permission to skip: hunt for a runtime (`command -v node`, nvm or Homebrew paths, the harness's own bundled node) and run it by full path. If none exists, halt the scan and report that Node must be installed (the parent relays this to the user); do **not** substitute grep for the detector or proceed unscanned. The scan checks literal font sizes against the **DESIGN.md** ramp but abstains on `em`, `%`, `clamp()`, and line-heights, so also grep `font-size\s*:`, `fontSize`, `text-\[`, `leading-\[` and judge those hits against the spec. Return the findings JSON plus the grep verdicts.

@@ -23,7 +23,8 @@
 ### Task 1: Claude-Native Configuration Contracts
 
 **Files:**
-- Create: `CLAUDE.md`
+- Create: `CLAUDE.global.md`
+- Rename: `AGENTS.md` to `CLAUDE.md`
 - Create: `.claude/settings.json`
 - Create: `.claude/mcp.json`
 - Create: `.claude/agents/*.md`
@@ -42,8 +43,8 @@
 - [ ] **Step 1: Rewrite configuration tests to assert Claude paths and routing**
 
 Assert that every `.claude/agents/*.md` agent has valid frontmatter, ordinary roles use
-`claude-opus-5`, and exactly `planner`, `implementer_deep`, `reviewer_deep`, and
-`security_reviewer` use `claude-fable-5`. Assert settings contain `PreToolUse` and
+`claude-opus-5`, and exactly `planner`, `implementer-deep`, `reviewer-deep`, and
+`security-reviewer` use `claude-fable-5`. Assert settings contain `PreToolUse` and
 `SessionStart`, and profiles contain explicit MCP enable/disable lists.
 
 - [ ] **Step 2: Run the focused tests and confirm the old layout fails**
@@ -70,7 +71,7 @@ Expected: PASS.
 Run:
 
 ```bash
-git add CLAUDE.md .claude profiles .gitignore tests/test_capability_bundle.py
+git add CLAUDE.md CLAUDE.global.md .claude profiles .gitignore tests/test_capability_bundle.py
 git add -u AGENTS.global.md .codex profiles
 git commit -m "feat: add Claude-native configuration"
 ```

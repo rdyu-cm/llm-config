@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PAT_TOKEN}"
+      }
+    },
+    "codebase_memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "codebase-memory-mcp@0.8.1"
+      ]
+    }
+  }
+}

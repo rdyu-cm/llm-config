@@ -95,7 +95,7 @@ is_windows_like_shell() {
 }
 
 # Some environments reap detached/background processes. Auto-foreground when detected.
-if [[ -n "${CODEX_CI:-}" && "$FOREGROUND" != "true" && "$FORCE_BACKGROUND" != "true" ]]; then
+if [[ -n "${CLAUDE_CODE_ENTRYPOINT:-}" && "$FOREGROUND" != "true" && "$FORCE_BACKGROUND" != "true" ]]; then
   FOREGROUND="true"
 fi
 

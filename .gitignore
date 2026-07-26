@@ -9,4 +9,4 @@ __pycache__/
 .codebase-memory/
 .worktrees/
 output/
-.codex/config.generated.toml
+.claude/settings.generated.json

@@ -105,8 +105,8 @@ Use the least powerful model that can handle each role to conserve cost and incr
 **Integration and judgment tasks** (multi-file coordination, pattern matching, debugging): use a standard model.
 
 **Architecture and design tasks**: use the most capable available model.
-For the final whole-branch review, when `agent_type` is available, dispatch
-`reviewer_deep`; otherwise use the generic parent-model fallback and report
+For the final whole-branch review, when `subagent_type` is available, dispatch
+`reviewer-deep`; otherwise use the generic parent-model fallback and report
 that no configured role or model pin was applied.
 
 **Review tasks**: choose the model with the same judgment, scaled to the
@@ -115,7 +115,7 @@ most capable model; a subtle concurrency change does.
 
 **When dispatching a general-purpose subagent, always specify the model explicitly.**
 An omitted model inherits your session's model — often the most capable and
-most expensive — which silently defeats this section. Named Codex agents get their model and reasoning settings from their TOML definitions; do not override them in the dispatch.
+most expensive — which silently defeats this section. Named Claude Code agents get their model and reasoning settings from their Markdown frontmatter; do not override them in the dispatch.
 
 **Turn count beats token price.** Wall-clock and context cost scale with how
 many turns a subagent takes, and the cheapest models routinely take 2-3× the
@@ -130,44 +130,19 @@ that implementer. Single-file mechanical fixes also take the cheapest tier.
 - Touches multiple files with integration concerns → standard model
 - Requires design judgment or broad codebase understanding → most capable model
 
-For every named Codex dispatch, pass the selected role as `agent_type`, set
-`fork_turns="none"`, use a unique descriptive `task_name`, and put all child
-context in the self-contained `message`. `agent_type` is the custom-role selector;
-`task_name` is only a descriptive task label. Do not pass `model` or
-`reasoning_effort` alongside a named role because its TOML definition owns
-those settings.
+For every dispatch, use Claude Code’s `Agent` tool with a self-contained prompt and select the named role through `subagent_type`. Do not override the model declared in the agent’s Markdown frontmatter.
 
-If the surfaced `spawn_agent` tool does not expose `agent_type`, omit `agent_type` and dispatch a generic child with `fork_turns="none"`, the same
-unique descriptive `task_name`, and the same self-contained `message`. That
-child inherits the parent model and reasoning effort. Missing `agent_type` alone is not a dispatch failure. Record the fallback accurately and do not
-claim that a configured Terra/Sol role pin was applied.
+### Claude Code Agent Tiers
 
-Stop only if `message`, `task_name`, or `fork_turns="none"` is unavailable, or
-if the generic spawn itself returns an error. Never substitute `task_name` as
-a role selector.
-
-### Codex Agent Tiers
-
-On Codex, select the named custom agent instead of relying on session-model
-inheritance:
-
-| Work | Codex agent | Model and reasoning |
+| Work | Claude Code agent | Model |
 | --- | --- | --- |
-| Complete specification, isolated change, one or two files | `implementer_fast` | `gpt-5.6-terra`, medium |
-| Multi-file integration, pattern matching, or debugging | `implementer_standard` | `gpt-5.6-terra`, medium |
-| Broad architectural context or substantial design judgment | `implementer_deep` | `gpt-5.6-sol`, high |
-| Small or routine task review | `reviewer_standard` | `gpt-5.6-sol`, medium |
-| Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer_deep` | `gpt-5.6-sol`, high |
+| Complete specification, isolated change, one or two files | `implementer-fast` | `claude-opus-5` |
+| Multi-file integration, pattern matching, or debugging | `implementer-standard` | `claude-opus-5` |
+| Broad architectural context or substantial design judgment | `implementer-deep` | `claude-fable-5` |
+| Small or routine task review | `reviewer-standard` | `claude-opus-5` |
+| Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer-deep` | `claude-fable-5` |
 
-When `agent_type` is available, the final whole-branch review uses
-`reviewer_deep`; otherwise it uses the generic parent-model fallback and
-reports that no configured role or model pin was applied. If an implementer
-reports that the task needs more reasoning, redispatch once at the next
-stronger implementer tier with the missing context; never repeat the same
-underpowered dispatch unchanged. If a required Codex agent is unavailable,
-direct the workflow to the generic parent-model fallback and report that no
-configured role pin was applied. On non-Codex platforms, keep using a general-purpose subagent with the
-explicit model selected by the policy above.
+The final whole-branch review uses `reviewer-deep`. If an implementer reports that the task needs more reasoning, redispatch once at the next stronger implementer tier with the missing context. If a required named agent is unavailable, stop and report the missing configuration instead of claiming its model ran.
 
 ## Handling Implementer Status
 

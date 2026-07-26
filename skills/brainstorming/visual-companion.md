@@ -69,7 +69,7 @@ On Windows, the script auto-detects and switches to foreground mode (which block
 
 **Codex:**
 ```bash
-# Codex reaps background processes. The script auto-detects CODEX_CI and
+# Claude Code may reap background processes. The script auto-detects CLAUDE_CODE_ENTRYPOINT and
 # switches to foreground mode. Run it normally — no extra flags needed.
 scripts/start-server.sh --project-dir /path/to/project --open
 ```

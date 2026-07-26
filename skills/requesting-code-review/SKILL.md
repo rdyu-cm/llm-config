@@ -31,17 +31,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **2. Dispatch code reviewer subagent:**
 
-On Codex, dispatch `reviewer_standard` by default and use `reviewer_deep` for
-broad, subtle, security-sensitive, concurrency-sensitive, or whole-branch
-changes. Pass the selected reviewer as `agent_type` with `fork_turns="none"`
-and put all child context in the self-contained `message`. If `agent_type` is
-unavailable, omit it and dispatch a generic child with `fork_turns="none"`, the
-same unique descriptive `task_name`, and the same self-contained `message`.
-That child inherits the parent model and reasoning effort. Report the fallback
-accurately and do not claim the selected reviewer role or its configured model
-was applied. Stop only if a required generic spawn field is unavailable or the
-generic spawn returns an error. On another platform, dispatch a `general-purpose` subagent with an
-explicit model appropriate to the same risk. Fill the template at
+On Claude Code, dispatch `reviewer-standard` by default and use `reviewer-deep` for broad, subtle, security-sensitive, concurrency-sensitive, or whole-branch changes. Use the `Agent` tool, select the role with `subagent_type`, and provide a self-contained prompt using [code-reviewer.md](code-reviewer.md). Do not override the model declared by the named agent.
 [code-reviewer.md](code-reviewer.md).
 
 **Placeholders:**

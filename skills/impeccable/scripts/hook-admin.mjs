@@ -71,66 +71,6 @@ const HOOK_MANIFEST_TARGETS = [
       },
     }),
   },
-  {
-    provider: '.agents',
-    skillRel: '.agents/skills/impeccable',
-    destRel: '.codex/hooks.json',
-    manifest: () => ({
-      hooks: {
-        PostToolUse: [
-          {
-            matcher: 'Edit|Write|apply_patch',
-            hooks: [
-              {
-                type: 'command',
-                command: 'node ".agents/skills/impeccable/scripts/hook.mjs"',
-                timeout: TIMEOUT_SECONDS,
-                statusMessage: STATUS_MESSAGE,
-              },
-            ],
-          },
-        ],
-      },
-    }),
-  },
-  {
-    provider: '.cursor',
-    skillRel: '.cursor/skills/impeccable',
-    destRel: '.cursor/hooks.json',
-    manifest: () => ({
-      version: 1,
-      hooks: {
-        preToolUse: [
-          {
-            command: 'node ".cursor/skills/impeccable/scripts/hook-before-edit.mjs"',
-            timeout: TIMEOUT_SECONDS,
-          },
-        ],
-      },
-    }),
-  },
-  {
-    // GitHub Copilot reads repo-level hooks from `.github/hooks/*.json`. The same
-    // manifest is honored by the CLI (once committed to the default branch) and
-    // the cloud/app agent. Schema differs: lowercase `postToolUse`, flat entries,
-    // `bash`/`timeoutSec`, and a `matcher` regex against the `edit`/`create` tools.
-    provider: '.github',
-    skillRel: '.github/skills/impeccable',
-    destRel: '.github/hooks/impeccable.json',
-    manifest: () => ({
-      version: 1,
-      hooks: {
-        postToolUse: [
-          {
-            type: 'command',
-            matcher: 'edit|create|apply_patch',
-            bash: 'node "$(git rev-parse --show-toplevel)/.github/skills/impeccable/scripts/hook.mjs"',
-            timeoutSec: TIMEOUT_SECONDS,
-          },
-        ],
-      },
-    }),
-  },
 ];
 
 function readRawConfigFile(filePath) {

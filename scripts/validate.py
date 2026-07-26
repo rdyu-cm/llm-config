@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the repository-contained Codex configuration without network access."""
+"""Validate the repository-contained Claude Code configuration offline."""
 
 from __future__ import annotations
 
@@ -11,15 +11,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+FABLE_AGENTS = {"planner", "implementer-deep", "reviewer-deep", "security-reviewer"}
 
 
 def fail(message: str) -> None:
     raise ValueError(message)
-
-
-def load_toml(path: Path) -> dict:
-    with path.open("rb") as handle:
-        return tomllib.load(handle)
 
 
 def parse_frontmatter(path: Path) -> dict[str, str]:
@@ -27,79 +23,74 @@ def parse_frontmatter(path: Path) -> dict[str, str]:
     match = re.match(r"\A---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
     if not match:
         fail(f"missing YAML frontmatter: {path.relative_to(ROOT)}")
-
-    lines = match.group(1).splitlines()
     values: dict[str, str] = {}
-    for index, line in enumerate(lines):
+    for line in match.group(1).splitlines():
         field = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$", line)
         if field:
-            value = field.group(2).strip().strip('"\'')
-            if not value:
-                continuation = []
-                for next_line in lines[index + 1 :]:
-                    if next_line.startswith((" ", "\t")):
-                        continuation.append(next_line.strip())
-                    else:
-                        break
-                value = " ".join(continuation)
-            values[field.group(1)] = value
-    for required in ("name", "description"):
-        if not values.get(required):
-            fail(f"missing {required} in {path.relative_to(ROOT)}")
+            values[field.group(1)] = field.group(2).strip().strip("\"'")
     return values
 
 
+def load_object(path: Path) -> dict:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        fail(f"{path.relative_to(ROOT)} must contain a JSON object")
+    return value
+
+
 def main() -> int:
-    config = load_toml(ROOT / ".codex" / "config.toml")
-    if config.get("sandbox_mode") != "workspace-write":
-        fail("base sandbox_mode must remain workspace-write")
+    settings = load_object(ROOT / ".claude/settings.json")
+    hooks = settings.get("hooks", {})
+    if not isinstance(hooks, dict) or not {"SessionStart", "PreToolUse"} <= hooks.keys():
+        fail("settings.json is missing required hooks")
+    load_object(ROOT / ".claude/mcp.json")
+    for path in sorted((ROOT / "profiles").glob("*.mcp.json")):
+        load_object(path)
+    if len(list((ROOT / "profiles").glob("*.mcp.json"))) != 4:
+        fail("expected four Claude settings profiles")
 
-    for path in sorted((ROOT / "profiles").glob("*.config.toml")):
-        load_toml(path)
-    load_toml(ROOT / "sources.lock.toml")
-    load_toml(ROOT / "plugins.lock.toml")
-
-    with (ROOT / ".codex" / "hooks.json").open(encoding="utf-8") as handle:
-        hooks = json.load(handle)
-    if "hooks" not in hooks or "PreToolUse" not in hooks["hooks"]:
-        fail("hooks.json is missing PreToolUse policy")
-
-    names: dict[str, Path] = {}
-    skills = sorted((ROOT / "skills").glob("*/SKILL.md"))
-    if not skills:
-        fail("no skills installed")
-    for path in skills:
+    skill_names: set[str] = set()
+    for path in sorted((ROOT / "skills").glob("*/SKILL.md")):
         metadata = parse_frontmatter(path)
-        name = metadata["name"]
-        if name in names:
-            fail(
-                f"duplicate skill name {name}: {names[name].relative_to(ROOT)} and {path.relative_to(ROOT)}"
-            )
-        names[name] = path
+        name = metadata.get("name", "")
+        if not name:
+            fail(f"missing skill metadata: {path.relative_to(ROOT)}")
+        if name in skill_names:
+            fail(f"duplicate skill name: {name}")
+        skill_names.add(name)
 
-    required_agent_fields = {"name", "description", "developer_instructions"}
-    agents = sorted((ROOT / ".codex" / "agents").glob("*.toml"))
+    agents = sorted((ROOT / ".claude/agents").glob("*.md"))
+    actual_fable: set[str] = set()
     for path in agents:
-        data = load_toml(path)
-        missing = sorted(required_agent_fields - data.keys())
-        if missing:
-            fail(f"{path.relative_to(ROOT)} missing fields: {', '.join(missing)}")
-        registration = config.get("agents", {}).get(data["name"])
-        if not isinstance(registration, dict):
-            fail(f"{data['name']} is not registered under [agents.{data['name']}]")
-        expected_path = f"agents/{path.name}"
-        if registration.get("config_file") != expected_path:
-            fail(f"{data['name']} config_file must be {expected_path}")
-        if registration.get("description") != data["description"]:
-            fail(f"{data['name']} registration description does not match its agent file")
+        metadata = parse_frontmatter(path)
+        for field in ("name", "description", "model", "tools", "permissionMode"):
+            if not metadata.get(field):
+                fail(f"{path.relative_to(ROOT)} missing {field}")
+        name = metadata["name"]
+        model = metadata["model"]
+        if model == "claude-fable-5":
+            actual_fable.add(name)
+        elif model != "claude-opus-5":
+            fail(f"{name} uses unexpected model {model}")
+    if actual_fable != FABLE_AGENTS:
+        fail(f"Fable routing mismatch: {sorted(actual_fable)}")
 
-    print(f"validated {len(skills)} personal skills, {len(agents)} agents, 3 hooks, and 4 profiles")
+    with (ROOT / "capability-bundle.toml").open("rb") as handle:
+        bundle = tomllib.load(handle)
+    for item in bundle.get("components", []):
+        if not (ROOT / item["path"]).exists():
+            fail(f"catalog path does not exist: {item['path']}")
+
+    print(
+        f"validated {len(skill_names)} personal skills, {len(agents)} agents, "
+        f"3 hook handlers, and 4 profiles"
+    )
     return 0
 
 
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (OSError, ValueError, tomllib.TOMLDecodeError, json.JSONDecodeError) as error:
+    except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as error:
         print(f"validation failed: {error}", file=sys.stderr)
         raise SystemExit(1)

@@ -1,7 +1,0 @@
-# Requires GITHUB_PAT_TOKEN; starts the pinned Codebase Memory npm package.
-[mcp_servers.github]
-enabled = true
-
-[mcp_servers.codebase_memory]
-enabled = true
-

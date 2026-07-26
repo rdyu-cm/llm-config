@@ -209,7 +209,7 @@ function readSuperpowersVersion() {
   const root = path.join(__dirname, '../../..');
   const manifests = [
     path.join(root, 'package.json'),
-    path.join(root, '.codex-plugin/plugin.json')
+    path.join(root, '.claude-plugin/plugin.json')
   ];
 
   for (const manifest of manifests) {

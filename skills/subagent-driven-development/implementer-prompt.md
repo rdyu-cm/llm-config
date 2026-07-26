@@ -2,14 +2,13 @@
 
 Use this template when dispatching an implementer subagent.
 
-**Codex named custom-agent form:**
+**Claude Code named-agent form:**
 
 ```
-spawn_agent:
-  agent_type: [AGENT]
-  fork_turns="none"
-  task_name: "[TASK_NAME]"
-  message: |
+Agent:
+  subsubagent_type: [AGENT]
+  description: "[TASK_NAME]"
+  prompt: |
     You are implementing Task N: [task name]
 
     ## Task Description
@@ -140,26 +139,24 @@ spawn_agent:
     information that wasn't provided. Never silently produce work you're unsure about.
 ```
 
-**Codex generic parent-model fallback:** If `agent_type` is unavailable, omit
-it and use the same self-contained message body shown above:
+**Claude Code general-purpose fallback:** If `subagent_type` is unavailable, omit
+it and use the same self-contained prompt body shown above:
 
 ```text
-spawn_agent:
-  fork_turns="none"
-  task_name: "[TASK_NAME]"
-  message: <same self-contained message body as the named form>
+Agent:
+  description: "[TASK_NAME]"
+  prompt: <same self-contained prompt body as the named form>
 ```
 
 This child inherits the parent model and reasoning effort. Do not claim the
 `[AGENT]` role or its configured model was applied.
 
-**Non-Codex dispatch:** On other platforms, use `general-purpose` and supply `[MODEL]` explicitly.
+**Other harnesses:** When supported, use `general-purpose` and supply `[MODEL]` explicitly.
 
 **Dispatch placeholders:**
-- `[AGENT]` — REQUIRED on Codex when `agent_type` is available: `implementer_fast`,
-  `implementer_standard`, or `implementer_deep` per SKILL.md Model Selection;
-  pass the selected role as `agent_type` with `fork_turns="none"`.
+- `[AGENT]` — REQUIRED on Claude Code when `subagent_type` is available: `implementer-fast`,
+  `implementer-standard`, or `implementer-deep` per SKILL.md Model Selection;
 - `[TASK_NAME]` — REQUIRED: a descriptive label unique within the parent session,
   for example `implement-task-3`.
-- `[MODEL]` — REQUIRED only for the non-Codex `general-purpose` dispatch;
+- `[MODEL]` — REQUIRED only for another harness `general-purpose` dispatch;
   choose per SKILL.md Model Selection.

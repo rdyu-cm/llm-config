@@ -4,7 +4,7 @@ workspace_policy = "one_writer_per_worktree"
 [[components]]
 name = "global"
 kind = "instructions"
-path = "AGENTS.global.md"
+path = "CLAUDE.global.md"
 classification = "supported"
 
 [[components]]
@@ -170,89 +170,81 @@ path = "skills/project-health"
 classification = "supported"
 
 [[components]]
-name = "browser_debugger"
+name = "browser-debugger"
 kind = "agent"
-path = ".codex/agents/browser-debugger.toml"
+path = ".claude/agents/browser-debugger.md"
 classification = "supported"
 
 [[components]]
-name = "docs_researcher"
+name = "docs-researcher"
 kind = "agent"
-path = ".codex/agents/docs-researcher.toml"
+path = ".claude/agents/docs-researcher.md"
 classification = "supported"
 
 [[components]]
 name = "reviewer"
 kind = "agent"
-path = ".codex/agents/reviewer.toml"
+path = ".claude/agents/reviewer.md"
 classification = "supported"
 
 [[components]]
-name = "security_reviewer"
+name = "security-reviewer"
 kind = "agent"
-path = ".codex/agents/security-reviewer.toml"
+path = ".claude/agents/security-reviewer.md"
 classification = "supported"
 
 [[components]]
 name = "planner"
 kind = "agent"
-path = ".codex/agents/planner.toml"
+path = ".claude/agents/planner.md"
 classification = "supported"
 
 [[components]]
 name = "implementer"
 kind = "agent"
-path = ".codex/agents/implementer.toml"
+path = ".claude/agents/implementer.md"
 classification = "supported"
 
 [[components]]
-name = "implementer_fast"
+name = "implementer-fast"
 kind = "agent"
-path = ".codex/agents/implementer_fast.toml"
+path = ".claude/agents/implementer-fast.md"
 classification = "supported"
 
 [[components]]
-name = "implementer_standard"
+name = "implementer-standard"
 kind = "agent"
-path = ".codex/agents/implementer_standard.toml"
+path = ".claude/agents/implementer-standard.md"
 classification = "supported"
 
 [[components]]
-name = "implementer_deep"
+name = "implementer-deep"
 kind = "agent"
-path = ".codex/agents/implementer_deep.toml"
+path = ".claude/agents/implementer-deep.md"
 classification = "supported"
 
 [[components]]
-name = "reviewer_standard"
+name = "reviewer-standard"
 kind = "agent"
-path = ".codex/agents/reviewer_standard.toml"
+path = ".claude/agents/reviewer-standard.md"
 classification = "supported"
 
 [[components]]
-name = "reviewer_deep"
+name = "reviewer-deep"
 kind = "agent"
-path = ".codex/agents/reviewer_deep.toml"
+path = ".claude/agents/reviewer-deep.md"
 classification = "supported"
 
 [[components]]
 name = "portable-hooks"
 kind = "hook"
-path = ".codex/hooks.json"
+path = ".claude/settings.json"
 classification = "preflight-required"
-
-[[components]]
-name = "openaiDeveloperDocs"
-kind = "mcp"
-path = ".codex/config.toml"
-classification = "preflight-required"
-enabled_tools = ["search_openai_docs", "fetch_openai_doc"]
-preflight_safe = true
 
 [[components]]
 name = "context7"
 kind = "mcp"
-path = ".codex/config.toml"
+path = ".claude/mcp.json"
 classification = "preflight-required"
 enabled_tools = ["resolve-library-id", "query-docs"]
 preflight_safe = true
@@ -260,39 +252,39 @@ preflight_safe = true
 [[components]]
 name = "github"
 kind = "mcp"
-path = ".codex/config.toml"
+path = ".claude/mcp.json"
 classification = "preflight-required"
 enabled_tools = ["get_file_contents", "search_code", "list_commits", "pull_request_read"]
 
 [[components]]
 name = "codebase_memory"
 kind = "mcp"
-path = ".codex/config.toml"
+path = ".claude/mcp.json"
 classification = "preflight-required"
 enabled_tools = ["search", "index_repository"]
 
 [[components]]
 name = "minimal"
 kind = "profile"
-path = "profiles/minimal.config.toml"
+path = "profiles/minimal.mcp.json"
 classification = "supported"
 
 [[components]]
 name = "frontend"
 kind = "profile"
-path = "profiles/frontend.config.toml"
+path = "profiles/frontend.mcp.json"
 classification = "supported"
 
 [[components]]
 name = "security"
 kind = "profile"
-path = "profiles/security.config.toml"
+path = "profiles/security.mcp.json"
 classification = "supported"
 
 [[components]]
 name = "full"
 kind = "profile"
-path = "profiles/full.config.toml"
+path = "profiles/full.mcp.json"
 classification = "supported"
 
 [[components]]

@@ -15,7 +15,7 @@ harness and are outside this repository.
 
 The fork remains the source of truth and targets Claude Code's user-level configuration:
 
-- `CLAUDE.md` contains compact global behavioral instructions.
+- `CLAUDE.global.md` contains compact global behavioral instructions and is linked to `~/.claude/CLAUDE.md`; root `CLAUDE.md` contains repository-maintenance instructions.
 - `.claude/settings.json` contains portable settings, permissions, and hooks.
 - `.claude/agents/*.md` defines custom subagents using YAML frontmatter.
 - `.claude/skills/` exposes the audited skill library through Claude Code's native skill

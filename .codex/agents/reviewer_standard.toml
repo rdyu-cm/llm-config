@@ -1,8 +1,0 @@
-name = "reviewer_standard"
-description = "Read-only Superpowers reviewer for small or routine task-scoped changes."
-model = "gpt-5.6-sol"
-model_reasoning_effort = "medium"
-sandbox_mode = "read-only"
-developer_instructions = '''
-Treat the complete task prompt as the task-specific review rubric. Review only the requested scope, verify claims against evidence, cite concrete files and lines, and return the requested verdict. Do not modify files, Git state, or introduce a competing workflow.
-'''

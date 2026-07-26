@@ -7,14 +7,13 @@ code quality.
 **Purpose:** Verify one task's implementation matches its requirements (nothing
 more, nothing less) and is well-built (clean, tested, maintainable)
 
-**Codex named custom-agent form:**
+**Claude Code named-agent form:**
 
 ```
-spawn_agent:
-  agent_type: [AGENT]
-  fork_turns="none"
-  task_name: "[TASK_NAME]"
-  message: |
+Agent:
+  subsubagent_type: [AGENT]
+  description: "[TASK_NAME]"
+  prompt: |
     You are reviewing one task's implementation: first whether it matches its
     requirements, then whether it is well-built. This is a task-scoped gate,
     not a merge review — a broad whole-branch review happens separately after
@@ -167,27 +166,25 @@ spawn_agent:
     **Reasoning:** [1-2 sentence technical assessment]
 ```
 
-**Codex generic parent-model fallback:** If `agent_type` is unavailable, omit
-it and use the same self-contained message body shown above:
+**Claude Code general-purpose fallback:** If `subagent_type` is unavailable, omit
+it and use the same self-contained prompt body shown above:
 
 ```text
-spawn_agent:
-  fork_turns="none"
-  task_name: "[TASK_NAME]"
-  message: <same self-contained message body as the named form>
+Agent:
+  description: "[TASK_NAME]"
+  prompt: <same self-contained prompt body as the named form>
 ```
 
 This child inherits the parent model and reasoning effort. Do not claim the
 `[AGENT]` role or its configured model was applied.
 
-**Non-Codex dispatch:** On other platforms, use `general-purpose` and supply
+**Other harnesses:** When supported, use `general-purpose` and supply
 `[MODEL]` explicitly.
 
 **Placeholders:**
-- `[AGENT]` — REQUIRED on Codex when `agent_type` is available:
-  `reviewer_standard` for a small or routine
-  task review, otherwise `reviewer_deep`; pass the selected role as
-  `agent_type` with `fork_turns="none"`.
+- `[AGENT]` — REQUIRED on Claude Code when `subagent_type` is available:
+  `reviewer-standard` for a small or routine
+  task review, otherwise `reviewer-deep`; pass the selected role as
 - `[TASK_NAME]` — REQUIRED: a descriptive label unique within the parent session,
   for example `review-task-3`.
 - `[MODEL]` — REQUIRED on platforms that use `general-purpose` instead of a

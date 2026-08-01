@@ -1,24 +1,42 @@
-# Portable Claude Code Config
+# Portable Agent Config
 
-An audited, repository-contained Claude Code setup for implementation, planning, debugging, review, frontend work, browser automation, and security analysis.
+An audited, repository-contained setup for **Codex and Claude Code** covering implementation, planning, debugging, review, frontend work, browser automation, and security analysis. Install either provider or both from one command; the skill library is shared, with provider differences documented inside each file rather than forked across two repositories.
 
-The repository is the source of truth. Bootstrap is a non-mutating dry run by default. Apply mode installs merged user settings, links instructions/agents/hooks/skills into Claude Code's global discovery paths, and registers portable MCP servers through the Claude CLI. Existing unmanaged files are reported as conflicts rather than overwritten.
+The repository is the source of truth. Bootstrap is a non-mutating dry run by default. Apply mode installs a merged config per provider, links instructions, agents, hooks, and skills into that provider's discovery paths, and registers MCP servers the way that provider expects. Existing unmanaged files are reported as conflicts rather than overwritten.
 
-Agents and skills are linked entry by entry rather than as whole directories, because Claude Code discovers both by name inside directories that other tools also install into. A neighbour this repository does not own is left untouched instead of blocking the install.
+Agents and skills are linked entry by entry rather than as whole directories, because both providers discover them by name inside directories that other tools also install into. A neighbour this repository does not own is left untouched instead of blocking the install.
 
 ## Quick start
 
-Claude Code is intentionally not installed by this repository. Install it first, then:
+Neither CLI is installed by this repository. Install at least one, then:
 
 ```bash
-# Preflight prerequisites, validate, apply, and verify the result.
+# Preflight, validate, apply, and verify. Installs for whichever CLIs are on PATH.
 ./scripts/install.sh
 
-# Or see what would change without touching your home directory.
+# Pick a provider explicitly.
+./scripts/install.sh --target codex
+./scripts/install.sh --target claude
+./scripts/install.sh --target both
+
+# See what would change without touching your home directory.
 ./scripts/install.sh --dry-run
 ```
 
-The individual steps remain available: `./scripts/doctor.sh` for an environment report, `./scripts/bootstrap.sh` for a dry run, and `./scripts/bootstrap.sh --apply` to apply. On Windows PowerShell, use `./scripts/bootstrap.ps1` and `./scripts/bootstrap.ps1 -Apply`; there is no PowerShell equivalent of `install.sh`.
+With no `--target`, the providers are inferred from the CLIs on `PATH` and the inference is printed before anything happens, so a machine that gains a second CLI later does not silently change what an unchanged command installs.
+
+The individual steps remain available: `./scripts/doctor.sh` for an environment report and `./scripts/bootstrap.sh [--apply] [--target ...]` for the install itself. On Windows PowerShell, use `./scripts/bootstrap.ps1`; it targets Claude Code only, and there is no PowerShell equivalent of `install.sh`.
+
+### Migrating from the split repositories
+
+This configuration was previously two repositories, and an existing machine has links pointing into whichever one it installed. Those are reported as adoptable, and nothing is repointed without asking:
+
+```bash
+./scripts/install.sh --dry-run          # lists what would be adopted
+./scripts/install.sh --adopt            # repoints them
+```
+
+A link is adoptable only when it points into a predecessor checkout of this same configuration. Anything else stays a conflict and is left alone. An older whole-directory link, such as `~/.agents/skills`, is replaced by per-entry links rather than followed.
 
 ### Onto a new machine
 
@@ -28,7 +46,7 @@ The installed entries are symlinks into this repository, so the clone is a perma
 git clone <remote> ~/claude/claude-config && ~/claude/claude-config/scripts/install.sh
 ```
 
-Requirements: Python 3.11 or newer (the validator imports `tomllib`), the Claude Code CLI, and Git. Node and `npx` are needed only for the `codebase_memory` MCP server. On Linux, `bubblewrap` and `socat` enable the sandbox; without them Bash commands run unsandboxed and the install still succeeds.
+Requirements: Python 3.11 or newer (the validator imports `tomllib`), at least one of the Codex or Claude Code CLIs, and Git. Node and `npx` are needed only for the `codebase_memory` MCP server. On Linux, `bubblewrap` and `socat` enable the sandbox; without them Bash commands run unsandboxed and the install still succeeds.
 
 Set `PYTHON` to select an interpreter when the default `python3` is older than 3.11:
 
@@ -38,16 +56,26 @@ PYTHON=/usr/bin/python3.11 ./scripts/install.sh
 
 ## Layout
 
-- `CLAUDE.global.md`: compact personal defaults linked to `~/.claude/CLAUDE.md`.
+Shared:
+
 - `CLAUDE.md`: instructions for maintaining this repository.
-- `.claude/settings.json`: portable settings, permissions, and lifecycle hooks.
-- `.claude/agents/`: Claude Code subagents with native Markdown/YAML frontmatter.
-- `.claude/hooks/`: deterministic safety and session-context hooks.
-- `.claude/mcp.json`: audited MCP source manifest used by bootstrap.
-- `skills/`: canonical vendored Agent Skills library.
-- `profiles/`: optional Claude settings overlays.
+- `skills/`: the canonical vendored skill library, one copy serving both providers.
+- `capability-bundle.toml`: catalog of every component, with a `provider` key on the provider-specific ones.
 - `sources.lock.toml` and `plugins.lock.toml`: audited upstream revisions and rationale.
-- `scripts/`: dry-run-first bootstrap, validation, health checks, and update checks.
+
+Claude Code:
+
+- `CLAUDE.global.md` linked to `~/.claude/CLAUDE.md`.
+- `.claude/settings.json`, `.claude/mcp.json`, `.claude/agents/*.md`, `.claude/hooks/`.
+- `profiles/*.mcp.json`.
+
+Codex:
+
+- `AGENTS.global.md` linked to `~/.codex/AGENTS.md`.
+- `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, `.codex/hooks/`.
+- `profiles/*.config.toml`. Skills are published to `~/.agents/skills`.
+
+`scripts/` holds the dry-run-first installer, bootstrap, validation, health checks, and update checks.
 
 ## Models
 
@@ -95,7 +123,9 @@ Waiting for other Codex or Claude sessions, queueing writers, leases, heartbeats
 
 ## Secrets and generated state
 
-Never commit credentials, Claude authentication state, `~/.claude.json`, transcripts, caches, MCP OAuth data, project trust, or generated settings. Machine-local settings belong in `~/.claude/settings.local.json`.
+Never commit credentials, authentication state (`~/.claude.json`, `~/.codex/auth.json`), transcripts, caches, MCP OAuth data, project trust, or generated configs. Machine-local settings belong in `~/.claude/settings.local.json` and `~/.codex/config.local.toml`.
+
+Claude Code stores settings as JSON and Codex as TOML. `scripts/sync_config.py` dispatches load and render on the file extension; the merge rules below are shared by both.
 
 Merge rules, portable over machine-local:
 

@@ -6,7 +6,7 @@ Use this template when dispatching an implementer subagent.
 
 ```
 Agent:
-  subsubagent_type: [AGENT]
+  subagent_type: [AGENT]
   description: "[TASK_NAME]"
   prompt: |
     You are implementing Task N: [task name]

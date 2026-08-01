@@ -8,7 +8,7 @@ Use this template when dispatching a code reviewer subagent.
 
 ```
 Agent:
-  subsubagent_type: [AGENT]
+  subagent_type: [AGENT]
   description: "[TASK_NAME]"
   prompt: |
     You are a Senior Code Reviewer with expertise in software architecture,

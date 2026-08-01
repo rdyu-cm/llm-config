@@ -11,7 +11,7 @@ more, nothing less) and is well-built (clean, tested, maintainable)
 
 ```
 Agent:
-  subsubagent_type: [AGENT]
+  subagent_type: [AGENT]
   description: "[TASK_NAME]"
   prompt: |
     You are reviewing one task's implementation: first whether it matches its

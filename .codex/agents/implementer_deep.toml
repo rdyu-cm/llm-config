@@ -1,0 +1,8 @@
+name = "implementer_deep"
+description = "Deep Superpowers implementation worker for tasks requiring broad context or substantial design judgment."
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"
+developer_instructions = '''
+Treat the complete task prompt as the task-specific contract. Implement only that bounded task, preserve unrelated changes, run the requested verification, and return the requested report. Do not publish, merge, broaden scope, or introduce a competing workflow.
+'''

@@ -17,7 +17,25 @@ check_command() {
   fi
 }
 
-check_command "Python 3" python3
+if PYTHON=$(sh -c '. /dev/stdin' <<'EOF'
+for candidate in "${PYTHON:-}" python3 python3.13 python3.12 python3.11; do
+  [ -n "$candidate" ] || continue
+  command -v "$candidate" >/dev/null 2>&1 || continue
+  if "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+    echo "$candidate"
+    exit 0
+  fi
+done
+exit 1
+EOF
+); then
+  echo "ok      Python 3.11+: $(command -v "$PYTHON") ($("$PYTHON" --version 2>&1))"
+else
+  PYTHON=python3
+  echo "missing Python 3.11 or newer (found $(python3 --version 2>&1 || echo none))" >&2
+  failures=$((failures + 1))
+fi
+
 check_command "Node.js" node
 check_command "npx" npx
 
@@ -27,7 +45,7 @@ else
   echo "optional Claude Code CLI not installed; dry-run and static validation remain available"
 fi
 
-if python3 "$ROOT/scripts/validate.py"; then
+if "$PYTHON" "$ROOT/scripts/validate.py"; then
   echo "ok      repository configuration"
 else
   failures=$((failures + 1))

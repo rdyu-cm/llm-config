@@ -216,6 +216,29 @@ class MergeAndBootstrapTests(unittest.TestCase):
             self.assertNotIn("foreign-skill", result.stdout)
             self.assertTrue(foreign.exists())
 
+    def test_install_refuses_an_interpreter_older_than_the_validator_needs(self) -> None:
+        # A bare `python3` probe passes on the 3.9 interpreters that ship with
+        # several long-term-support distributions, then fails later on tomllib.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            (bin_dir / "python3").write_text(
+                "#!/bin/sh\n"
+                'case "$1" in --version) echo "Python 3.9.18"; exit 0;; esac\n'
+                'exec /usr/bin/env python3.9 "$@" 2>/dev/null || exit 1\n'
+            )
+            (bin_dir / "python3").chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/install.sh"), "--dry-run"],
+                env={"HOME": str(root / "home"), "PATH": f"{bin_dir}:/usr/bin:/bin"},
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Python 3.11 or newer is required", result.stderr)
+            self.assertFalse((root / "home/.claude").exists())
+
     def test_bootstrap_defaults_to_non_mutating_dry_run(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"

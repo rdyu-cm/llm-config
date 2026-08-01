@@ -29,13 +29,24 @@ while [ "$#" -gt 0 ]; do
 done
 
 find_python() {
-  for candidate in "${PYTHON:-}" python3; do
-    if [ -n "$candidate" ] && command -v "$candidate" >/dev/null 2>&1; then
+  # tomllib landed in 3.11 and the validator imports it, so a bare `python3`
+  # check passes on the 3.9 interpreters that ship with several long-term-support
+  # distributions and then fails later with an unrelated import error.
+  found=false
+  for candidate in "${PYTHON:-}" python3 python3.13 python3.12 python3.11; do
+    [ -n "$candidate" ] || continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    found=true
+    if "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
       echo "$candidate"
-      return
+      return 0
     fi
   done
-  echo "Python 3.11 or newer is required" >&2
+  if [ "$found" = true ]; then
+    echo "Python 3.11 or newer is required; found $(python3 --version 2>&1)" >&2
+  else
+    echo "Python 3.11 or newer is required; no python3 interpreter was found" >&2
+  fi
   return 1
 }
 

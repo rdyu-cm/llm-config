@@ -8,20 +8,33 @@ Agents and skills are linked entry by entry rather than as whole directories, be
 
 ## Quick start
 
-Claude Code is intentionally not installed by this repository.
+Claude Code is intentionally not installed by this repository. Install it first, then:
 
 ```bash
-# Inspect planned changes; does not modify your home directory.
-./scripts/bootstrap.sh
+# Preflight prerequisites, validate, apply, and verify the result.
+./scripts/install.sh
 
-# Validate the repository and local prerequisites.
-./scripts/doctor.sh
-
-# After installing Claude Code and reviewing conflicts:
-./scripts/bootstrap.sh --apply
+# Or see what would change without touching your home directory.
+./scripts/install.sh --dry-run
 ```
 
-On Windows PowerShell, use `./scripts/bootstrap.ps1` for a dry run and `./scripts/bootstrap.ps1 -Apply` to apply.
+The individual steps remain available: `./scripts/doctor.sh` for an environment report, `./scripts/bootstrap.sh` for a dry run, and `./scripts/bootstrap.sh --apply` to apply. On Windows PowerShell, use `./scripts/bootstrap.ps1` and `./scripts/bootstrap.ps1 -Apply`; there is no PowerShell equivalent of `install.sh`.
+
+### Onto a new machine
+
+The installed entries are symlinks into this repository, so the clone is a permanent dependency rather than a staging directory. Put it somewhere durable and identical across machines if you want the paths to match.
+
+```bash
+git clone <remote> ~/claude/claude-config && ~/claude/claude-config/scripts/install.sh
+```
+
+Requirements: Python 3.11 or newer (the validator imports `tomllib`), the Claude Code CLI, and Git. Node and `npx` are needed only for the `codebase_memory` MCP server. On Linux, `bubblewrap` and `socat` enable the sandbox; without them Bash commands run unsandboxed and the install still succeeds.
+
+Set `PYTHON` to select an interpreter when the default `python3` is older than 3.11:
+
+```bash
+PYTHON=/usr/bin/python3.11 ./scripts/install.sh
+```
 
 ## Layout
 

@@ -9,21 +9,34 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 APPLY=true
+PASSTHROUGH=""
+
+usage() {
+  echo "usage: scripts/install.sh [--dry-run] [--target codex|claude|both] [--adopt]"
+  echo
+  echo "Installs this configuration into the home directory of one or both"
+  echo "providers. With no --target, installs for whichever CLIs are on PATH."
+  echo
+  echo "  --dry-run  report what would change without touching the home directory"
+  echo "  --target   codex, claude, or both"
+  echo "  --adopt    repoint links that point into a predecessor checkout of"
+  echo "             this configuration; anything unrecognized stays a conflict"
+}
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dry-run) APPLY=false ;;
-    -h|--help)
-      echo "usage: scripts/install.sh [--dry-run]"
-      echo
-      echo "Installs this configuration into \$HOME/.claude. With --dry-run,"
-      echo "reports what would change without touching the home directory."
-      exit 0
+    --adopt) PASSTHROUGH="$PASSTHROUGH --adopt" ;;
+    --target)
+      shift
+      [ "$#" -gt 0 ] || { usage >&2; exit 2; }
+      case "$1" in
+        codex|claude|both) PASSTHROUGH="$PASSTHROUGH --target $1" ;;
+        *) usage >&2; exit 2 ;;
+      esac
       ;;
-    *)
-      echo "usage: scripts/install.sh [--dry-run]" >&2
-      exit 2
-      ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
   esac
   shift
 done
@@ -53,13 +66,17 @@ done
 echo "ok      Python: $(command -v "$PYTHON") ($("$PYTHON" --version 2>&1))"
 export PYTHON
 
-if [ "$APPLY" = true ] && ! command -v claude >/dev/null 2>&1; then
-  fail "the Claude Code CLI is required before applying, and this repository
-  intentionally does not install it. Install Claude Code, then rerun.
-  See https://code.claude.com/docs/en/quickstart"
-fi
-if command -v claude >/dev/null 2>&1; then
-  echo "ok      Claude Code: $(command -v claude)"
+found_cli=false
+for cli in codex claude; do
+  if command -v "$cli" >/dev/null 2>&1; then
+    echo "ok      $cli: $(command -v "$cli")"
+    found_cli=true
+  fi
+done
+if [ "$found_cli" = false ]; then
+  fail "no Codex or Claude Code CLI was found, and this repository intentionally
+  does not install either. Install at least one, then rerun.
+  Claude Code: https://code.claude.com/docs/en/quickstart"
 fi
 
 echo
@@ -75,10 +92,10 @@ sh "$ROOT/scripts/doctor.sh" || echo "note    doctor reported problems; see abov
 echo
 if [ "$APPLY" = true ]; then
   echo "==> Apply"
-  sh "$ROOT/scripts/bootstrap.sh" --apply || fail "bootstrap could not apply cleanly; resolve the conflicts above and rerun."
+  sh "$ROOT/scripts/bootstrap.sh" --apply $PASSTHROUGH || fail "bootstrap could not apply cleanly; resolve the conflicts above and rerun."
 else
   echo "==> Dry run"
-  sh "$ROOT/scripts/bootstrap.sh" || fail "the dry run reported conflicts; resolve them before applying."
+  sh "$ROOT/scripts/bootstrap.sh" $PASSTHROUGH || fail "the dry run reported conflicts; resolve them before applying."
   echo
   echo "Dry run only. Rerun without --dry-run to install."
   exit 0
@@ -87,23 +104,33 @@ fi
 echo
 echo "==> Verify the installed configuration"
 status=0
-for path in CLAUDE.md hooks agents skills settings.json; do
-  target="$HOME/.claude/$path"
-  if [ -e "$target" ]; then
-    echo "ok      $target"
-  else
-    echo "missing $target" >&2
-    status=1
-  fi
-done
+verified=0
+
 # -L is required: the installed entries are symlinks, and find does not descend
 # into a symlinked directory without it. Counting zero must fail rather than
 # read as a successful install.
-agents=$(find -L "$HOME/.claude/agents" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-skills=$(find -L "$HOME/.claude/skills" -maxdepth 2 -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ')
-echo "found   $agents agents and $skills skills"
-[ "$agents" -gt 0 ] || { echo "missing no agents are discoverable" >&2; status=1; }
-[ "$skills" -gt 0 ] || { echo "missing no skills are discoverable" >&2; status=1; }
+verify_provider() {
+  label=$1; home=$2; instructions=$3; config=$4; skills_dir=$5
+  [ -d "$home" ] || return 0
+  verified=$((verified + 1))
+  for path in "$instructions" hooks agents "$config"; do
+    if [ -e "$home/$path" ]; then
+      echo "ok      $home/$path"
+    else
+      echo "missing $home/$path" >&2
+      status=1
+    fi
+  done
+  agents=$(find -L "$home/agents" -maxdepth 1 \( -name '*.md' -o -name '*.toml' \) 2>/dev/null | wc -l | tr -d ' ')
+  skills=$(find -L "$skills_dir" -maxdepth 2 -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ')
+  echo "found   $label: $agents agents and $skills skills"
+  [ "$agents" -gt 0 ] || { echo "missing $label has no discoverable agents" >&2; status=1; }
+  [ "$skills" -gt 0 ] || { echo "missing $label has no discoverable skills" >&2; status=1; }
+}
+
+verify_provider Codex "$HOME/.codex" AGENTS.md config.toml "$HOME/.agents/skills"
+verify_provider "Claude Code" "$HOME/.claude" CLAUDE.md settings.json "$HOME/.claude/skills"
+[ "$verified" -gt 0 ] || { echo "missing neither provider home exists" >&2; status=1; }
 [ "$status" -eq 0 ] || fail "the install completed but the result is incomplete."
 
 echo

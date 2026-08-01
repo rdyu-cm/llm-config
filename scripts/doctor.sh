@@ -39,11 +39,13 @@ fi
 check_command "Node.js" node
 check_command "npx" npx
 
-if command -v claude >/dev/null 2>&1; then
-  echo "ok      Claude Code: $(command -v claude)"
-else
-  echo "optional Claude Code CLI not installed; dry-run and static validation remain available"
-fi
+for cli in codex claude; do
+  if command -v "$cli" >/dev/null 2>&1; then
+    echo "ok      $cli CLI: $(command -v "$cli")"
+  else
+    echo "optional $cli CLI not installed; that provider will be skipped"
+  fi
+done
 
 if "$PYTHON" "$ROOT/scripts/validate.py"; then
   echo "ok      repository configuration"
@@ -71,11 +73,13 @@ case "$(uname -s)" in
     ;;
 esac
 
-if [ -e "$HOME/.claude/settings.json" ]; then
-  echo "ok      global Claude settings exist"
-else
-  echo "optional global Claude settings are not installed"
-fi
+for pair in ".codex/config.toml:Codex" ".claude/settings.json:Claude Code"; do
+  if [ -e "$HOME/${pair%%:*}" ]; then
+    echo "ok      ${pair##*:} config is installed"
+  else
+    echo "optional ${pair##*:} config is not installed"
+  fi
+done
 
 if [ -n "${GITHUB_PAT_TOKEN:-}" ]; then
   echo "ok      GITHUB_PAT_TOKEN is set"

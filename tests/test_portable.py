@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -184,7 +185,8 @@ class MergeAndBootstrapTests(unittest.TestCase):
                 local.write_text(local_text)
                 self.run_sync(base, local, output)
                 if suffix == ".toml":
-                    merged = tomllib.load(output.open("rb"))
+                    with output.open("rb") as handle:
+                        merged = tomllib.load(handle)
                 else:
                     merged = json.loads(output.read_text(encoding="utf-8"))
                 self.assertEqual(merged["a"], "portable")
@@ -272,6 +274,88 @@ class MergeAndBootstrapTests(unittest.TestCase):
         self.assertIn("find -L", source)
         self.assertNotIn("$(find \"$HOME", source)
 
+    def bootstrap(self, home: Path, *args: str, stubs: Path | None = None) -> subprocess.CompletedProcess:
+        path = f"{stubs}:{os.environ['PATH']}" if stubs else os.environ["PATH"]
+        return subprocess.run(
+            ["bash", str(ROOT / "scripts/bootstrap.sh"), *args],
+            env={**os.environ, "HOME": str(home), "PATH": path, "PYTHON": sys.executable},
+            capture_output=True,
+            text=True,
+        )
+
+    def stub_clis(self, root: Path) -> Path:
+        bin_dir = root / "bin"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        for name in ("codex", "claude"):
+            (bin_dir / name).write_text("#!/bin/sh\nexit 0\n")
+            (bin_dir / name).chmod(0o755)
+        return bin_dir
+
+    def test_each_target_installs_only_its_own_provider(self) -> None:
+        expected = {
+            "codex": (".codex/AGENTS.md", ".codex/config.toml", ".codex/hooks.json", ".agents/skills"),
+            "claude": (".claude/CLAUDE.md", ".claude/settings.json", ".claude/skills"),
+        }
+        other = {"codex": ".claude", "claude": ".codex"}
+        for target in ("codex", "claude"):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                home = root / "home"
+                home.mkdir()
+                result = self.bootstrap(home, "--apply", "--target", target, stubs=self.stub_clis(root))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                for path in expected[target]:
+                    self.assertTrue((home / path).exists(), f"{path} missing for {target}")
+                self.assertFalse((home / other[target]).exists(), "the other provider was touched")
+
+    def test_a_whole_directory_link_is_never_written_through(self) -> None:
+        # An older layout linked ~/.agents/skills as one directory. Descending
+        # into that link writes entries into the repository it points at.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            predecessor = root / "old/codex-config/skills"
+            (predecessor / "legacy-skill").mkdir(parents=True)
+            (home / ".agents").mkdir(parents=True)
+            (home / ".agents/skills").symlink_to(predecessor)
+            stubs = self.stub_clis(root)
+
+            refused = self.bootstrap(home, "--apply", "--target", "codex", stubs=stubs)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("whole-directory link", refused.stderr)
+            self.assertEqual(len(list(predecessor.iterdir())), 1, "wrote into the predecessor")
+
+            adopted = self.bootstrap(home, "--apply", "--adopt", "--target", "codex", stubs=stubs)
+            self.assertEqual(adopted.returncode, 0, adopted.stdout + adopted.stderr)
+            self.assertEqual(len(list(predecessor.iterdir())), 1, "wrote into the predecessor")
+            self.assertFalse((home / ".agents/skills").is_symlink())
+            self.assertTrue((home / ".agents/skills/writing-plans").exists())
+
+    def test_adoption_repoints_predecessors_but_not_foreign_links(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            predecessor = root / "old/codex-config"
+            (predecessor / ".codex/agents").mkdir(parents=True)
+            (predecessor / "AGENTS.global.md").write_text("old\n")
+            (home / ".codex").mkdir(parents=True)
+            (home / ".codex/AGENTS.md").symlink_to(predecessor / "AGENTS.global.md")
+            (home / ".codex/hooks.json").symlink_to("/etc/hostname")
+            stubs = self.stub_clis(root)
+
+            refused = self.bootstrap(home, "--apply", "--target", "codex", stubs=stubs)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("adoptable", refused.stderr)
+            self.assertIn("--adopt", refused.stderr)
+            self.assertEqual(
+                (home / ".codex/AGENTS.md").readlink(), predecessor / "AGENTS.global.md"
+            )
+
+            adopted = self.bootstrap(home, "--apply", "--adopt", "--target", "codex", stubs=stubs)
+            self.assertNotEqual(adopted.returncode, 0, "the foreign link must stay a conflict")
+            self.assertEqual((home / ".codex/AGENTS.md").readlink(), ROOT / "AGENTS.global.md")
+            self.assertEqual((home / ".codex/hooks.json").readlink(), Path("/etc/hostname"))
+
     def test_bootstrap_defaults_to_non_mutating_dry_run(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"
@@ -293,16 +377,32 @@ class MergeAndBootstrapTests(unittest.TestCase):
             bin_dir = root / "bin"
             home.mkdir()
             bin_dir.mkdir()
-            for name, target in (("python3", sys.executable), ("bash", "/bin/bash")):
-                (bin_dir / name).symlink_to(target)
+            for name in ("python3", "bash", "dirname", "uname", "cmp", "mkdir", "ln", "basename"):
+                source = shutil.which(name)
+                if source:
+                    (bin_dir / name).symlink_to(
+                        sys.executable if name == "python3" else source
+                    )
+            # An explicit target must still preflight its own CLI. Without one,
+            # inference now fails earlier with its own message.
             result = subprocess.run(
-                ["/bin/bash", str(ROOT / "scripts/bootstrap.sh"), "--apply"],
+                ["/bin/bash", str(ROOT / "scripts/bootstrap.sh"), "--apply", "--target", "claude"],
                 env={"HOME": str(home), "PATH": str(bin_dir), "PYTHON": sys.executable},
                 capture_output=True,
                 text=True,
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Claude Code CLI is required", result.stderr)
+            self.assertFalse((home / ".claude").exists())
+
+            inferred = subprocess.run(
+                ["/bin/bash", str(ROOT / "scripts/bootstrap.sh"), "--apply"],
+                env={"HOME": str(home), "PATH": str(bin_dir), "PYTHON": sys.executable},
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(inferred.returncode, 0)
+            self.assertIn("No Codex or Claude Code CLI found", inferred.stderr)
             self.assertFalse((home / ".claude").exists())
 
 

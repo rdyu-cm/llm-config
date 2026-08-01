@@ -3,27 +3,41 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 APPLY=false
+ADOPT=false
+TARGETS=""
 action_seen=false
 conflicts=0
-LOCAL_SETTINGS="$HOME/.claude/settings.local.json"
-GENERATED_SETTINGS="$ROOT/.claude/settings.generated.json"
+adoptions=0
+
+usage() {
+  echo "usage: scripts/bootstrap.sh [--dry-run|--apply] [--target codex|claude|both] [--adopt]" >&2
+  exit 2
+}
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dry-run)
-      [ "$action_seen" = false ] || { echo "usage: scripts/bootstrap.sh [--dry-run|--apply]" >&2; exit 2; }
+      [ "$action_seen" = false ] || usage
       action_seen=true
       APPLY=false
       ;;
     --apply)
-      [ "$action_seen" = false ] || { echo "usage: scripts/bootstrap.sh [--dry-run|--apply]" >&2; exit 2; }
+      [ "$action_seen" = false ] || usage
       action_seen=true
       APPLY=true
       ;;
-    *)
-      echo "usage: scripts/bootstrap.sh [--dry-run|--apply]" >&2
-      exit 2
+    --adopt) ADOPT=true ;;
+    --target)
+      shift
+      [ "$#" -gt 0 ] || usage
+      case "$1" in
+        codex) TARGETS="codex" ;;
+        claude) TARGETS="claude" ;;
+        both) TARGETS="codex claude" ;;
+        *) usage ;;
+      esac
       ;;
+    *) usage ;;
   esac
   shift
 done
@@ -51,10 +65,68 @@ find_python() {
 }
 
 PYTHON=$(find_python)
-if [ "$APPLY" = true ] && ! command -v claude >/dev/null 2>&1; then
-  echo "Claude Code CLI is required for --apply; install it and rerun." >&2
-  exit 1
+
+# Infer the target from the CLIs on PATH when none was requested, and say what
+# was inferred. A machine that grows a second CLI later must not silently change
+# what an unchanged command installs.
+if [ -z "$TARGETS" ]; then
+  command -v codex >/dev/null 2>&1 && TARGETS="codex"
+  command -v claude >/dev/null 2>&1 && TARGETS="${TARGETS:+$TARGETS }claude"
+  if [ -z "$TARGETS" ]; then
+    echo "No Codex or Claude Code CLI found on PATH; install one, or pass --target explicitly." >&2
+    exit 1
+  fi
+  echo "target  inferred from PATH:$(printf ' %s' $TARGETS)"
 fi
+
+# --- provider descriptors ---------------------------------------------------
+# The two providers disagree on every install detail: home directory, config
+# format, overlay name, where skills go, and how MCP servers are registered.
+# Each accessor answers one question for the provider in TARGET.
+
+provider_cli() { [ "$TARGET" = codex ] && echo codex || echo claude; }
+provider_label() { [ "$TARGET" = codex ] && echo Codex || echo "Claude Code"; }
+provider_home() { [ "$TARGET" = codex ] && echo "$HOME/.codex" || echo "$HOME/.claude"; }
+provider_base() {
+  [ "$TARGET" = codex ] && echo "$ROOT/.codex/config.toml" || echo "$ROOT/.claude/settings.json"
+}
+provider_config() {
+  [ "$TARGET" = codex ] && echo "$(provider_home)/config.toml" || echo "$(provider_home)/settings.json"
+}
+provider_overlay() {
+  [ "$TARGET" = codex ] && echo "$(provider_home)/config.local.toml" \
+    || echo "$(provider_home)/settings.local.json"
+}
+provider_generated() {
+  [ "$TARGET" = codex ] && echo "$ROOT/.codex/config.generated.toml" \
+    || echo "$ROOT/.claude/settings.generated.json"
+}
+provider_instructions() {
+  [ "$TARGET" = codex ] && echo "$ROOT/AGENTS.global.md:$(provider_home)/AGENTS.md" \
+    || echo "$ROOT/CLAUDE.global.md:$(provider_home)/CLAUDE.md"
+}
+# Codex publishes skills to a shared directory outside its own home.
+provider_skills() {
+  [ "$TARGET" = codex ] && echo "$HOME/.agents/skills" || echo "$(provider_home)/skills"
+}
+provider_agents() {
+  [ "$TARGET" = codex ] && echo "$ROOT/.codex/agents" || echo "$ROOT/.claude/agents"
+}
+provider_hooks() {
+  [ "$TARGET" = codex ] && echo "$ROOT/.codex/hooks" || echo "$ROOT/.claude/hooks"
+}
+
+# --- linking ----------------------------------------------------------------
+
+# A link that points into a predecessor checkout of this same configuration is
+# adoptable: repointing it is a migration, not an overwrite of someone else's
+# work. Anything else stays a conflict.
+is_predecessor() {
+  case "$1" in
+    */codex-config/*|*/claude-config/*|*/codex-config|*/claude-config) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 link_item() {
   source_path=$1
@@ -63,7 +135,22 @@ link_item() {
     current=$(readlink "$target_path")
     if [ "$current" = "$source_path" ]; then
       echo "ok      $target_path"
-      return
+      return 0
+    fi
+    if is_predecessor "$current"; then
+      adoptions=$((adoptions + 1))
+      if [ "$ADOPT" != true ]; then
+        echo "adoptable $target_path -> $current" >&2
+        return 1
+      fi
+      if [ "$APPLY" = true ]; then
+        rm -f "$target_path"
+        ln -s "$source_path" "$target_path"
+        echo "adopted $target_path -> $source_path"
+      else
+        echo "would   adopt $target_path (was $current)"
+      fi
+      return 0
     fi
     echo "conflict $target_path -> $current" >&2
     return 1
@@ -82,13 +169,36 @@ link_item() {
 }
 
 link_children() {
-  # Claude Code discovers skills and agents by name inside a shared directory
+  # Both providers discover skills and agents by name inside a shared directory
   # that other tools also install into. Linking the directory itself would make
   # any pre-existing entry an unresolvable conflict, so each entry is linked
   # individually and unrelated neighbours are left alone.
   source_dir=$1
   target_dir=$2
   status=0
+  # An older layout linked the whole directory. Descending into such a link
+  # would write entries through it and into the repository it points at, so the
+  # link is resolved first and never followed.
+  if [ -L "$target_dir" ]; then
+    current=$(readlink "$target_dir")
+    if [ "$current" = "$source_dir" ] || is_predecessor "$current"; then
+      adoptions=$((adoptions + 1))
+      if [ "$ADOPT" != true ]; then
+        echo "adoptable $target_dir -> $current (whole-directory link)" >&2
+        return 1
+      fi
+      if [ "$APPLY" = true ]; then
+        rm -f "$target_dir"
+        echo "adopted $target_dir (was a link to $current)"
+      else
+        echo "would   adopt $target_dir (was a link to $current)"
+        return 0
+      fi
+    else
+      echo "conflict $target_dir -> $current; move or merge it manually" >&2
+      return 1
+    fi
+  fi
   if [ "$APPLY" = true ]; then
     mkdir -p "$target_dir"
   fi
@@ -99,51 +209,57 @@ link_children() {
   return "$status"
 }
 
-install_settings() {
-  target="$HOME/.claude/settings.json"
-  # Claude Code owns settings.json and writes settings.local.json on its own, so
-  # neither file existing is a conflict. Anything in settings.json that this
-  # repository did not generate is unmanaged and gets folded into the overlay
-  # instead of being discarded. A byte-identical match against the last
+install_config() {
+  target=$(provider_config)
+  overlay=$(provider_overlay)
+  generated=$(provider_generated)
+  # Each provider owns its active config and writes its own machine-local
+  # overlay, so neither file existing is a conflict. Anything in the active file
+  # that this repository did not generate is unmanaged and gets folded into the
+  # overlay instead of being discarded. A byte-identical match against the last
   # generated file is how a previous apply is recognized, which keeps portable
   # values from being baked into the overlay on every rerun.
   carry=""
   if [ -e "$target" ]; then
-    if [ -e "$GENERATED_SETTINGS" ] && cmp -s "$target" "$GENERATED_SETTINGS"; then
+    if [ -e "$generated" ] && cmp -s "$target" "$generated"; then
       echo "ok      $target was generated by this repository"
     else
       carry="$target"
-      echo "would   fold unmanaged $target into $LOCAL_SETTINGS"
+      echo "would   fold unmanaged $target into $overlay"
     fi
   fi
   if [ "$APPLY" = true ]; then
     if [ -n "$carry" ]; then
       "$PYTHON" "$ROOT/scripts/sync_config.py" \
-        --base "$ROOT/.claude/settings.json" --local "$LOCAL_SETTINGS" \
-        --carry "$carry" --output "$GENERATED_SETTINGS"
+        --base "$(provider_base)" --local "$overlay" --carry "$carry" --output "$generated"
     else
       "$PYTHON" "$ROOT/scripts/sync_config.py" \
-        --base "$ROOT/.claude/settings.json" --local "$LOCAL_SETTINGS" \
-        --output "$GENERATED_SETTINGS"
+        --base "$(provider_base)" --local "$overlay" --output "$generated"
     fi
     mkdir -p "$(dirname -- "$target")"
-    cp "$GENERATED_SETTINGS" "$target.tmp"
+    cp "$generated" "$target.tmp"
     mv "$target.tmp" "$target"
     echo "installed $target"
   else
-    echo "would   merge portable settings with $LOCAL_SETTINGS"
-    echo "would   install merged settings at $target"
+    echo "would   merge portable config with $overlay"
+    echo "would   install merged config at $target"
   fi
 }
 
 install_mcp() {
+  # Codex declares MCP servers inside config.toml, so installing the config
+  # already registered them. Claude Code registers them through its CLI.
+  if [ "$TARGET" = codex ]; then
+    echo "ok      MCP servers are declared in config.toml"
+    return 0
+  fi
   if [ "$APPLY" = false ]; then
     echo "would   add user MCP servers: context7, codebase_memory"
     echo "would   add user MCP server github only when GITHUB_PAT_TOKEN is set"
-    return
+    return 0
   fi
   command -v claude >/dev/null 2>&1 || {
-    echo "Claude Code CLI is required for --apply; install it and rerun." >&2
+    echo "Claude Code CLI is required to register MCP servers; install it and rerun." >&2
     return 1
   }
   claude mcp add --transport http --scope user context7 https://mcp.context7.com/mcp
@@ -154,25 +270,58 @@ install_mcp() {
   fi
 }
 
+install_target() {
+  echo
+  if [ "$APPLY" = true ]; then
+    echo "== $(provider_label) (apply)"
+  else
+    echo "== $(provider_label) (dry-run)"
+  fi
+
+  if [ "$APPLY" = true ] && ! command -v "$(provider_cli)" >/dev/null 2>&1; then
+    echo "$(provider_label) CLI is required for --apply; install it or drop it from --target." >&2
+    return 1
+  fi
+
+  install_config || return 1
+
+  instructions=$(provider_instructions)
+  link_item "${instructions%%:*}" "${instructions##*:}" || conflicts=$((conflicts + 1))
+  link_item "$(provider_hooks)" "$(provider_home)/hooks" || conflicts=$((conflicts + 1))
+  link_children "$(provider_agents)" "$(provider_home)/agents" || conflicts=$((conflicts + 1))
+  link_children "$ROOT/skills" "$(provider_skills)" || conflicts=$((conflicts + 1))
+
+  if [ "$TARGET" = codex ]; then
+    link_item "$ROOT/.codex/hooks.json" "$(provider_home)/hooks.json" || conflicts=$((conflicts + 1))
+    for profile in "$ROOT"/profiles/*.config.toml; do
+      [ -e "$profile" ] || continue
+      link_item "$profile" "$(provider_home)/$(basename -- "$profile")" || conflicts=$((conflicts + 1))
+    done
+  fi
+
+  install_mcp || return 1
+}
+
 if [ "$APPLY" = true ]; then
-  echo "Portable Claude Code bootstrap (apply)"
+  echo "Portable agent configuration bootstrap (apply)"
 else
-  echo "Portable Claude Code bootstrap (dry-run)"
+  echo "Portable agent configuration bootstrap (dry-run)"
 fi
 
-install_settings || exit 1
-link_item "$ROOT/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md" || conflicts=$((conflicts + 1))
-link_item "$ROOT/.claude/hooks" "$HOME/.claude/hooks" || conflicts=$((conflicts + 1))
-link_children "$ROOT/.claude/agents" "$HOME/.claude/agents" || conflicts=$((conflicts + 1))
-link_children "$ROOT/skills" "$HOME/.claude/skills" || conflicts=$((conflicts + 1))
+for TARGET in $TARGETS; do
+  install_target || exit 1
+done
 
+echo
 if [ "$conflicts" -ne 0 ]; then
   echo "Found $conflicts conflict(s); nothing was overwritten." >&2
+  if [ "$adoptions" -ne 0 ] && [ "$ADOPT" != true ]; then
+    echo "$adoptions of them point into a predecessor checkout of this configuration." >&2
+    echo "Rerun with --adopt to repoint those and leave the rest untouched." >&2
+  fi
   exit 1
 fi
 
-install_mcp || exit 1
-
 if [ "$APPLY" = false ]; then
-  echo "Dry-run only. Install Claude Code, then rerun with --apply after resolving conflicts."
+  echo "Dry-run only. Rerun with --apply after resolving conflicts."
 fi

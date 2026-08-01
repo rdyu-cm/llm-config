@@ -96,9 +96,14 @@ for path in CLAUDE.md hooks agents skills settings.json; do
     status=1
   fi
 done
-agents=$(find "$HOME/.claude/agents" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-skills=$(find "$HOME/.claude/skills" -maxdepth 2 -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ')
-echo "ok      $agents agents and $skills skills are discoverable"
+# -L is required: the installed entries are symlinks, and find does not descend
+# into a symlinked directory without it. Counting zero must fail rather than
+# read as a successful install.
+agents=$(find -L "$HOME/.claude/agents" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+skills=$(find -L "$HOME/.claude/skills" -maxdepth 2 -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ')
+echo "found   $agents agents and $skills skills"
+[ "$agents" -gt 0 ] || { echo "missing no agents are discoverable" >&2; status=1; }
+[ "$skills" -gt 0 ] || { echo "missing no skills are discoverable" >&2; status=1; }
 [ "$status" -eq 0 ] || fail "the install completed but the result is incomplete."
 
 echo

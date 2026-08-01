@@ -239,6 +239,13 @@ class MergeAndBootstrapTests(unittest.TestCase):
             self.assertIn("Python 3.11 or newer is required", result.stderr)
             self.assertFalse((root / "home/.claude").exists())
 
+    def test_install_verification_counts_through_symlinks(self) -> None:
+        # The installed entries are symlinks, so a verification step that does
+        # not follow them counts zero and would report a broken install as fine.
+        source = (ROOT / "scripts/install.sh").read_text(encoding="utf-8")
+        self.assertIn("find -L", source)
+        self.assertNotIn("$(find \"$HOME", source)
+
     def test_bootstrap_defaults_to_non_mutating_dry_run(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"

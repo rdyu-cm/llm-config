@@ -165,6 +165,32 @@ class MergeAndBootstrapTests(unittest.TestCase):
                 len(json.loads(output.read_text(encoding="utf-8"))["hooks"]["SessionStart"]), 2
             )
 
+    def test_toml_and_json_share_one_merge(self) -> None:
+        # Codex stores config as TOML and Claude Code as JSON. Only load and
+        # render may differ; the merge semantics must be the same or the two
+        # providers drift apart again.
+        import tomllib
+
+        for suffix, base_text, local_text in (
+            (".toml", 'a = "portable"\nb = [2]\n', 'a = "local"\nb = [1]\nkeep = true\n'),
+            (".json", '{"a":"portable","b":[2]}', '{"a":"local","b":[1],"keep":true}'),
+        ):
+            with self.subTest(suffix=suffix), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                base = root / f"base{suffix}"
+                local = root / f"local{suffix}"
+                output = root / f"out{suffix}"
+                base.write_text(base_text)
+                local.write_text(local_text)
+                self.run_sync(base, local, output)
+                if suffix == ".toml":
+                    merged = tomllib.load(output.open("rb"))
+                else:
+                    merged = json.loads(output.read_text(encoding="utf-8"))
+                self.assertEqual(merged["a"], "portable")
+                self.assertEqual(merged["b"], [1, 2])
+                self.assertTrue(merged["keep"])
+
     def test_carry_folds_unmanaged_settings_into_the_local_overlay(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

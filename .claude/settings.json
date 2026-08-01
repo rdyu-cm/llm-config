@@ -12,6 +12,72 @@
       "Read(./config/credentials.json)"
     ]
   },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": false,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": true,
+    "network": {
+      "allowedDomains": [
+        "api.anthropic.com",
+        "statsig.anthropic.com",
+        "sentry.io",
+        "code.claude.com",
+        "docs.claude.com",
+        "mcp.context7.com",
+        "api.githubcopilot.com",
+        "github.com",
+        "*.github.com",
+        "*.githubusercontent.com",
+        "registry.npmjs.org",
+        "pypi.org",
+        "files.pythonhosted.org",
+        "crates.io",
+        "static.crates.io",
+        "index.crates.io",
+        "proxy.golang.org",
+        "sum.golang.org"
+      ],
+      "deniedDomains": [
+        "169.254.169.254",
+        "metadata.google.internal"
+      ]
+    },
+    "filesystem": {
+      "denyWrite": [
+        "~/.claude",
+        "~/.ssh",
+        "~/.gnupg",
+        "~/.aws",
+        "~/.config/gcloud",
+        "~/.gitconfig",
+        "~/.config/git",
+        "~/.bashrc",
+        "~/.bash_profile",
+        "~/.profile",
+        "~/.zshrc"
+      ]
+    },
+    "credentials": {
+      "files": [
+        {"path": "~/.ssh", "mode": "deny"},
+        {"path": "~/.gnupg", "mode": "deny"},
+        {"path": "~/.aws", "mode": "deny"},
+        {"path": "~/.config/gcloud", "mode": "deny"},
+        {"path": "~/.netrc", "mode": "deny"},
+        {"path": "~/.npmrc", "mode": "deny"},
+        {"path": "~/.docker/config.json", "mode": "deny"},
+        {"path": "~/.claude/.credentials.json", "mode": "deny"}
+      ],
+      "envVars": [
+        {"name": "ANTHROPIC_API_KEY", "mode": "deny"},
+        {"name": "ANTHROPIC_AUTH_TOKEN", "mode": "deny"},
+        {"name": "AWS_SECRET_ACCESS_KEY", "mode": "deny"},
+        {"name": "AWS_SESSION_TOKEN", "mode": "deny"},
+        {"name": "NPM_TOKEN", "mode": "deny"}
+      ]
+    }
+  },
   "hooks": {
     "SessionStart": [
       {

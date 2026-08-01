@@ -17,6 +17,7 @@ Keep changes small, evidence-driven, and directly tied to the request.
 - Use `brainstorming` when a change has material product, architecture, interface, or behavior choices.
 - Use `writing-plans` for an approved design that requires multi-step implementation.
 - Do not run overlapping planning workflows by default.
+- Planning runs on Fable. Main sessions run on Opus and must not switch models. When a task needs a real plan — architecture, sequencing, risk, or verification strategy — delegate to the `planner` or `Plan` agent instead of planning inline, and treat the returned plan as input rather than as an approved decision.
 
 ## Worktrees
 

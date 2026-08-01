@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FABLE_AGENTS = {"planner", "implementer-deep", "reviewer-deep", "security-reviewer"}
+FABLE_AGENTS = {"Plan", "planner", "implementer-deep", "reviewer-deep", "security-reviewer"}
 
 
 def fail(message: str) -> None:

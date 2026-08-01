@@ -33,6 +33,26 @@ else
   failures=$((failures + 1))
 fi
 
+# The sandbox degrades to a warning rather than failing when dependencies are
+# missing, so a missing tool is reported as optional rather than as a failure.
+case "$(uname -s)" in
+  Linux)
+    for tool in bwrap socat; do
+      if command -v "$tool" >/dev/null 2>&1; then
+        echo "ok      sandbox dependency $tool: $(command -v "$tool")"
+      else
+        echo "optional sandbox dependency $tool is missing; Bash commands will run unsandboxed"
+      fi
+    done
+    ;;
+  Darwin)
+    echo "ok      sandbox uses the built-in macOS sandbox; no extra dependencies"
+    ;;
+  *)
+    echo "optional sandbox dependency check is not implemented for $(uname -s)"
+    ;;
+esac
+
 if [ -e "$HOME/.claude/settings.json" ]; then
   echo "ok      global Claude settings exist"
 else

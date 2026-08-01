@@ -4,6 +4,8 @@ An audited, repository-contained Claude Code setup for implementation, planning,
 
 The repository is the source of truth. Bootstrap is a non-mutating dry run by default. Apply mode installs merged user settings, links instructions/agents/hooks/skills into Claude Code's global discovery paths, and registers portable MCP servers through the Claude CLI. Existing unmanaged files are reported as conflicts rather than overwritten.
 
+Agents and skills are linked entry by entry rather than as whole directories, because Claude Code discovers both by name inside directories that other tools also install into. A neighbour this repository does not own is left untouched instead of blocking the install.
+
 ## Quick start
 
 Claude Code is intentionally not installed by this repository.
@@ -36,7 +38,9 @@ On Windows PowerShell, use `./scripts/bootstrap.ps1` for a dry run and `./script
 
 ## Models
 
-Named agents use `claude-opus-5` by default. Four explicitly difficult roles use `claude-fable-5`: `planner`, `implementer-deep`, `reviewer-deep`, and `security-reviewer`. Main sessions are not instructed to switch to Fable automatically.
+Main sessions and named agents use `claude-opus-5` by default. Five explicitly difficult roles use `claude-fable-5`: `planner`, `Plan`, `implementer-deep`, `reviewer-deep`, and `security-reviewer`.
+
+`Plan` overrides Claude Code's built-in planning subagent, so planning delegated through either the built-in name or the portable `planner` name runs on Fable. Main sessions are still never instructed to switch their own model; `CLAUDE.global.md` routes planning work to those agents instead. Claude Code has no setting that changes the model used by plan mode itself — the only built-in variant is the `opusplan` alias (Opus while planning, Sonnet otherwise), which cannot express Opus-resting plus Fable-planning — so delegation is the supported mechanism.
 
 ## MCP servers
 
@@ -52,13 +56,25 @@ Anthropic product documentation is researched through Claude Code's web tools an
 
 Launch one with `claude --strict-mcp-config --mcp-config profiles/<name>.mcp.json` to use only that profile’s MCP servers for the session.
 
+## Sandbox
+
+`sandbox.enabled` puts Bash commands inside Claude Code's OS-level sandbox — the counterpart to Codex's `sandbox_mode = "workspace-write"`, and a real boundary rather than a pattern match. Linux and WSL2 need `bubblewrap` (and `socat` for network filtering); macOS and native Windows are supported directly.
+
+- `failIfUnavailable` stays `false`, so a host without the dependencies warns and runs unsandboxed instead of refusing to start. Portability wins over a hard gate here; set it to `true` on a machine where sandboxing is mandatory.
+- `allowUnsandboxedCommands` stays `true`, so a command that a sandbox restriction breaks can be retried outside it and falls back to ordinary permission prompts.
+- `autoAllowBashIfSandboxed` lets sandboxed commands run without prompting. Combined with the credential rules below, routine work stays quiet and credential-touching work surfaces a prompt.
+- `network.allowedDomains` covers the toolchain this repository actually uses. `strictAllowlist` is deliberately unset, so an unlisted host prompts rather than failing outright. `deniedDomains` blocks the cloud instance-metadata endpoints unconditionally.
+- `credentials.files` and `credentials.envVars` deny sandboxed commands access to SSH, GPG, cloud, registry, and Claude Code's own OAuth token. `gh` credentials are intentionally not denied, because two skills in this library drive `gh` directly.
+
+Known Linux limitation: glob patterns in `Read(...)`/`Edit(...)` permission rules are dropped when they are translated into sandbox filesystem rules, so the `Read(./.env.*)` deny narrows to the sandbox-independent permission check on Linux. `claude doctor` reports this. Non-glob rules and everything in `sandbox.filesystem` are unaffected.
+
 ## Hooks
 
 - `session_context.py` injects one compact reminder about verification and graph discovery.
 - `command_policy.py` blocks only catastrophic host commands.
 - `secret_guard.py` rejects Claude `Edit`/`Write` payloads that target likely credential files or add recognizable private keys and tokens.
 
-Hooks are guardrails, not a complete security boundary. Claude Code permissions and user confirmation remain primary controls.
+Hooks are guardrails, not a complete security boundary. The sandbox, Claude Code permissions, and user confirmation remain the primary controls.
 
 ## Cross-session coordination
 
@@ -66,7 +82,13 @@ Waiting for other Codex or Claude sessions, queueing writers, leases, heartbeats
 
 ## Secrets and generated state
 
-Never commit credentials, Claude authentication state, `~/.claude.json`, transcripts, caches, MCP OAuth data, project trust, or generated settings. Machine-local settings belong in `~/.claude/settings.local.json`; portable values win on matching keys.
+Never commit credentials, Claude authentication state, `~/.claude.json`, transcripts, caches, MCP OAuth data, project trust, or generated settings. Machine-local settings belong in `~/.claude/settings.local.json`.
+
+Merge rules, portable over machine-local:
+
+- Objects merge recursively and portable values win on matching scalar keys.
+- Lists are combined as ordered unions, machine-local entries first. Replacing them would drop machine-local data that has no portable counterpart — an unrelated `hooks.SessionStart` handler, or an accumulated `permissions.allow` list. Equal entries are carried once, so repeated applies do not grow the file.
+- Anything in `~/.claude/settings.json` that this repository did not generate is folded into the machine-local overlay before the merge, instead of being discarded. Apply recognizes its own previous output by comparing against `.claude/settings.generated.json`, so portable values are never baked into the overlay. Both files existing is normal, not a conflict: Claude Code writes each of them on its own.
 
 ## Verification
 

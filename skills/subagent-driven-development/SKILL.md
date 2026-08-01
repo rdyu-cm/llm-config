@@ -142,6 +142,19 @@ For every dispatch, use Claude Code’s `Agent` tool with a self-contained promp
 | Small or routine task review | `reviewer-standard` | `claude-opus-5` |
 | Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer-deep` | `claude-fable-5` |
 
+### Codex Agent Tiers
+
+On Codex, select the named custom agent instead of relying on session-model
+inheritance:
+
+| Work | Codex agent | Model and reasoning |
+| --- | --- | --- |
+| Complete specification, isolated change, one or two files | `implementer_fast` | `gpt-5.6-terra`, medium |
+| Multi-file integration, pattern matching, or debugging | `implementer_standard` | `gpt-5.6-terra`, medium |
+| Broad architectural context or substantial design judgment | `implementer_deep` | `gpt-5.6-sol`, high |
+| Small or routine task review | `reviewer_standard` | `gpt-5.6-sol`, medium |
+| Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer_deep` | `gpt-5.6-sol`, high |
+
 The final whole-branch review uses `reviewer-deep`. If an implementer reports that the task needs more reasoning, redispatch once at the next stronger implementer tier with the missing context. If a required named agent is unavailable, stop and report the missing configuration instead of claiming its model ran.
 
 ## Handling Implementer Status

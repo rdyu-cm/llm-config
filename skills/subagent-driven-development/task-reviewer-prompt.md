@@ -166,6 +166,18 @@ Agent:
     **Reasoning:** [1-2 sentence technical assessment]
 ```
 
+**Codex named custom-agent form:** the same prompt body, dispatched through
+Codex's keys. `subagent_type` becomes `agent_type`, `description` becomes
+`task_name`, and `prompt` becomes `message`; add `fork_turns="none"`.
+
+```
+spawn_agent:
+  agent_type: [AGENT]
+  fork_turns="none"
+  task_name: "[TASK_NAME]"
+  message: <the same self-contained body shown above>
+```
+
 **Claude Code general-purpose fallback:** If `subagent_type` is unavailable, omit
 it and use the same self-contained prompt body shown above:
 
@@ -175,6 +187,8 @@ Agent:
   prompt: <same self-contained prompt body as the named form>
 ```
 
+**Codex generic parent-model fallback:** if `agent_type` is unavailable, omit it and pass the same self-contained `message` body.
+
 This child inherits the parent model and reasoning effort. Do not claim the
 `[AGENT]` role or its configured model was applied.
 
@@ -182,7 +196,8 @@ This child inherits the parent model and reasoning effort. Do not claim the
 `[MODEL]` explicitly.
 
 **Placeholders:**
-- `[AGENT]` — REQUIRED on Claude Code when `subagent_type` is available:
+- `[AGENT]` — REQUIRED when a named role is available (`subagent_type` on Claude
+  Code, `agent_type` on Codex). Claude Code hyphenates and Codex underscores:
   `reviewer-standard` for a small or routine
   task review, otherwise `reviewer-deep`; pass the selected role as
 - `[TASK_NAME]` — REQUIRED: a descriptive label unique within the parent session,

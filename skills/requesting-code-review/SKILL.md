@@ -31,7 +31,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **2. Dispatch code reviewer subagent:**
 
-On Claude Code, dispatch `reviewer-standard` by default and use `reviewer-deep` for broad, subtle, security-sensitive, concurrency-sensitive, or whole-branch changes. Use the `Agent` tool, select the role with `subagent_type`, and provide a self-contained prompt using [code-reviewer.md](code-reviewer.md). Do not override the model declared by the named agent.
+Dispatch the standard reviewer by default and the deep reviewer for broad, subtle, security-sensitive, concurrency-sensitive, or whole-branch changes. On Claude Code these are `reviewer-standard` and `reviewer-deep`, selected with `subagent_type` on the `Agent` tool; on Codex they are `reviewer_standard` and `reviewer_deep`, selected with `agent_type` on `spawn_agent`. Provide a self-contained prompt using [code-reviewer.md](code-reviewer.md). Do not override the model declared by the named agent.
 [code-reviewer.md](code-reviewer.md).
 
 **Placeholders:**

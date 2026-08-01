@@ -83,6 +83,39 @@ class ConfigurationTests(unittest.TestCase):
         )
 
 
+class SharedSkillTests(unittest.TestCase):
+    # One copy of each skill serves both providers. The port forked these files
+    # and three defects followed, so a one-sided edit must fail here rather than
+    # silently reintroduce the fork.
+    DISPATCH_FILES = (
+        "skills/requesting-code-review/SKILL.md",
+        "skills/requesting-code-review/code-reviewer.md",
+        "skills/subagent-driven-development/SKILL.md",
+        "skills/subagent-driven-development/implementer-prompt.md",
+        "skills/subagent-driven-development/task-reviewer-prompt.md",
+    )
+
+    def test_dispatch_documentation_covers_both_providers(self) -> None:
+        for name in self.DISPATCH_FILES:
+            with self.subTest(file=name):
+                text = (ROOT / name).read_text(encoding="utf-8")
+                self.assertIn("Codex", text)
+                self.assertIn("Claude Code", text)
+
+    def test_no_skill_is_duplicated_per_provider(self) -> None:
+        skills = {path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")}
+        for suffix in ("-codex", "-claude", "_codex", "_claude"):
+            forked = {name for name in skills if name.endswith(suffix)}
+            self.assertEqual(forked, set(), f"per-provider skill fork: {forked}")
+
+    def test_both_provider_agent_manifests_are_present(self) -> None:
+        # The port deleted the Codex per-skill manifests; losing them again
+        # would silently drop Codex agent routing for those skills.
+        self.assertGreater(len(list((ROOT / "skills").glob("*/agents/openai.yaml"))), 0)
+        self.assertGreater(len(list((ROOT / ".codex/agents").glob("*.toml"))), 0)
+        self.assertGreater(len(list((ROOT / ".claude/agents").glob("*.md"))), 0)
+
+
 class HookTests(unittest.TestCase):
     def test_command_policy_blocks_root_but_allows_scoped_cleanup(self) -> None:
         blocked = run_hook(

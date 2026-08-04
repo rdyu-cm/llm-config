@@ -493,5 +493,122 @@ class MergeAndBootstrapTests(unittest.TestCase):
             self.assertFalse((home / ".claude").exists())
 
 
+class EccUpdateReviewTests(unittest.TestCase):
+    def git(self, repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    def make_upstream(self, root: Path) -> tuple[Path, str, str]:
+        repo = root / "ecc-upstream"
+        repo.mkdir()
+        self.git(repo, "init", "-b", "main")
+        self.git(repo, "config", "user.name", "ECC Test")
+        self.git(repo, "config", "user.email", "ecc-test@example.invalid")
+        adopted = repo / "skills/deep-research/SKILL.md"
+        adopted.parent.mkdir(parents=True)
+        adopted.write_text("version one\n", encoding="utf-8")
+        (repo / "README.md").write_text("unrelated one\n", encoding="utf-8")
+        self.git(repo, "add", ".")
+        self.git(repo, "commit", "-m", "initial")
+        pinned = self.git(repo, "rev-parse", "HEAD").stdout.strip()
+        adopted.write_text("version two\n", encoding="utf-8")
+        (repo / "README.md").write_text("unrelated two\n", encoding="utf-8")
+        self.git(repo, "add", ".")
+        self.git(repo, "commit", "-m", "update")
+        candidate = self.git(repo, "rev-parse", "HEAD").stdout.strip()
+        return repo, pinned, candidate
+
+    def write_lock(self, path: Path, repository: Path, commit: str, *, include_ecc: bool = True) -> None:
+        if include_ecc:
+            path.write_text(
+                "\n".join(
+                    (
+                        "version = 1",
+                        "[[sources]]",
+                        'name = "ecc"',
+                        f'repository = "{repository}"',
+                        f'commit = "{commit}"',
+                        'license = "MIT"',
+                        'items = ["deep-research", "eval-harness", "unified-memory", "strategic-compact", "mle-workflow"]',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        else:
+            path.write_text("version = 1\nsources = []\n", encoding="utf-8")
+
+    def test_review_reports_only_adopted_paths_without_mutating_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, pinned, candidate = self.make_upstream(root)
+            lock = root / "sources.lock.toml"
+            self.write_lock(lock, repo, pinned)
+            lock_before = lock.read_bytes()
+            status_before = self.git(repo, "status", "--porcelain=v1").stdout
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/review_ecc_updates.py"),
+                    "--lock",
+                    str(lock),
+                    "--candidate",
+                    candidate,
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(pinned, result.stdout)
+            self.assertIn(candidate, result.stdout)
+            self.assertIn("M\tskills/deep-research/SKILL.md", result.stdout)
+            self.assertNotIn("README.md", result.stdout)
+            self.assertIn("does not modify", result.stdout)
+            self.assertEqual(lock.read_bytes(), lock_before)
+            self.assertEqual(self.git(repo, "status", "--porcelain=v1").stdout, status_before)
+
+    def test_review_fails_closed_when_ecc_source_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lock = root / "sources.lock.toml"
+            self.write_lock(lock, root, "0" * 40, include_ecc=False)
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/review_ecc_updates.py"), "--lock", str(lock)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("ECC source", result.stderr)
+
+    def test_update_script_dispatches_ecc_review_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, pinned, candidate = self.make_upstream(root)
+            lock = root / "sources.lock.toml"
+            self.write_lock(lock, repo, pinned)
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(ROOT / "scripts/update.sh"),
+                    "--review",
+                    "ecc",
+                    "--lock",
+                    str(lock),
+                    "--candidate",
+                    candidate,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("skills/deep-research/SKILL.md", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

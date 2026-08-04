@@ -3,12 +3,15 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
-if [ "${1:-}" = "--apply" ]; then
+if [ "${1:-}" = "--review" ] && [ "${2:-}" = "ecc" ]; then
+  shift 2
+  exec python3 "$ROOT/scripts/review_ecc_updates.py" "$@"
+elif [ "${1:-}" = "--apply" ]; then
   echo "Automatic replacement is intentionally disabled." >&2
   echo "Review upstream diffs, update sources.lock.toml, then reinstall audited paths with the Claude Code skill workflow." >&2
   exit 2
 elif [ "${1:-}" != "" ]; then
-  echo "usage: scripts/update.sh" >&2
+  echo "usage: scripts/update.sh [--review ecc [--lock PATH] [--candidate COMMIT]]" >&2
   exit 2
 fi
 

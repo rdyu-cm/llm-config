@@ -123,7 +123,7 @@ provider_hooks() {
 # work. Anything else stays a conflict.
 is_predecessor() {
   case "$1" in
-    */codex-config/*|*/claude-config/*|*/codex-config|*/claude-config) return 0 ;;
+    */codex-config/*|*/claude-config/*|*/llm-config/*|*/codex-config|*/claude-config|*/llm-config) return 0 ;;
     *) return 1 ;;
   esac
 }

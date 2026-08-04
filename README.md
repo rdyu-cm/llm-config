@@ -43,7 +43,7 @@ A link is adoptable only when it points into a predecessor checkout of this same
 The installed entries are symlinks into this repository, so the clone is a permanent dependency rather than a staging directory. Put it somewhere durable and identical across machines if you want the paths to match.
 
 ```bash
-git clone <remote> ~/claude/claude-config && ~/claude/claude-config/scripts/install.sh
+git clone <remote> ~/llms/llm-config && ~/llms/llm-config/scripts/install.sh
 ```
 
 Requirements: Python 3.11 or newer (the validator imports `tomllib`), at least one of the Codex or Claude Code CLIs, and Git. Node and `npx` are needed only for the `codebase_memory` MCP server. On Linux, `bubblewrap` and `socat` enable the sandbox; without them Bash commands run unsandboxed and the install still succeeds.

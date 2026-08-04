@@ -92,6 +92,15 @@ def review(lock_path: Path, candidate: str | None) -> int:
             run_git("update-ref", "refs/ecc/candidate", "refs/ecc/pinned", cwd=repo)
         else:
             fetch_ref(repo, repository, candidate, "refs/ecc/candidate")
+        any_changes = bool(
+            run_git(
+                "diff",
+                "--name-only",
+                "refs/ecc/pinned",
+                "refs/ecc/candidate",
+                cwd=repo,
+            ).strip()
+        )
         changes = run_git(
             "diff",
             "--name-status",
@@ -108,6 +117,8 @@ def review(lock_path: Path, candidate: str | None) -> int:
     if changes:
         print("Changes in adopted ECC source paths:")
         print(changes)
+    elif any_changes:
+        print("ECC changed only outside the five adopted source paths.")
     else:
         print("No changes in the five adopted ECC source paths.")
     print("This review does not modify skills, the lock file, or either checkout.")

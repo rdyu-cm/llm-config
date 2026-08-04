@@ -169,6 +169,12 @@ class SharedSkillTests(unittest.TestCase):
         self.assertIn("single question", bodies["scientific-ml"])
         self.assertIn("reproduc", bodies["scientific-ml"].lower())
 
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for name in ecc["adaptations"]:
+            self.assertIn(f"`{name}`", readme)
+        self.assertIn("scripts/update.sh --review ecc", readme)
+        self.assertIn("never applies updates automatically", readme)
+
 
 class HookTests(unittest.TestCase):
     def test_command_policy_blocks_root_but_allows_scoped_cleanup(self) -> None:
@@ -585,6 +591,33 @@ class EccUpdateReviewTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("ECC source", result.stderr)
+
+    def test_review_distinguishes_unrelated_only_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, pinned, _ = self.make_upstream(root)
+            (repo / "skills/deep-research/SKILL.md").write_text("version one\n", encoding="utf-8")
+            (repo / "README.md").write_text("unrelated three\n", encoding="utf-8")
+            self.git(repo, "add", ".")
+            self.git(repo, "commit", "-m", "unrelated only from pin")
+            candidate = self.git(repo, "rev-parse", "HEAD").stdout.strip()
+            lock = root / "sources.lock.toml"
+            self.write_lock(lock, repo, pinned)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/review_ecc_updates.py"),
+                    "--lock",
+                    str(lock),
+                    "--candidate",
+                    candidate,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("changed only outside", result.stdout)
+            self.assertNotIn("README.md", result.stdout)
 
     def test_update_script_dispatches_ecc_review_arguments(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

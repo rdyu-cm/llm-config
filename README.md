@@ -77,6 +77,33 @@ Codex:
 
 `scripts/` holds the dry-run-first installer, bootstrap, validation, health checks, and update checks.
 
+## Scientific research
+
+Five shared skills adapt a narrow, audited subset of ECC for both providers without
+installing ECC's plugin, agents, commands, hooks, rules, dashboard, memory runtime, or MCP
+servers:
+
+- `scientific-research`: primary-source discovery, evidence assessment, cited synthesis,
+  and durable research artifacts.
+- `research-eval`: reproducible evaluation contracts, uncertainty, subgroup analysis, and
+  explicit verdicts.
+- `research-memory`: inspectable source, experiment, decision, negative-result, question,
+  and handoff notes with an unreviewed-context trust boundary.
+- `research-compact`: evidence-linked, redacted continuation records for long sessions.
+- `scientific-ml`: hypothesis-driven ML experiments with provenance, leakage controls,
+  baselines, ablations, uncertainty, and reproducible artifacts.
+
+ECC is pinned in `sources.lock.toml`. The normal update check reports when that repository
+moves. To inspect only changes under the five upstream workflows used by these adaptations:
+
+```bash
+scripts/update.sh --review ecc
+```
+
+The review uses a temporary Git repository and never applies updates automatically. Inspect
+the upstream diff, adapt relevant changes locally, run verification, and update the pin
+manually.
+
 ## Models
 
 Main sessions and named agents use `claude-opus-5` by default. Five explicitly difficult roles use `claude-fable-5`: `planner`, `Plan`, `implementer-deep`, `reviewer-deep`, and `security-reviewer`.

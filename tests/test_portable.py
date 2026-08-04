@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -114,6 +115,65 @@ class SharedSkillTests(unittest.TestCase):
         self.assertGreater(len(list((ROOT / "skills").glob("*/agents/openai.yaml"))), 0)
         self.assertGreater(len(list((ROOT / ".codex/agents").glob("*.toml"))), 0)
         self.assertGreater(len(list((ROOT / ".claude/agents").glob("*.md"))), 0)
+
+    def test_scientific_ecc_sources_are_narrow_and_pinned(self) -> None:
+        with (ROOT / "sources.lock.toml").open("rb") as handle:
+            sources = tomllib.load(handle)["sources"]
+        ecc = next((source for source in sources if source["name"] == "ecc"), None)
+        self.assertIsNotNone(ecc, "missing pinned ECC source")
+        self.assertEqual(ecc["repository"], "https://github.com/affaan-m/ECC")
+        self.assertRegex(ecc["commit"], r"^[0-9a-f]{40}$")
+        self.assertEqual(ecc["commit"], "7a5757e6c0d7e8e1080d30169b4b044d76e0f7fc")
+        self.assertEqual(ecc["license"], "MIT")
+        self.assertEqual(
+            ecc["items"],
+            ["deep-research", "eval-harness", "unified-memory", "strategic-compact", "mle-workflow"],
+        )
+        self.assertEqual(
+            ecc["adaptations"],
+            ["scientific-research", "research-eval", "research-memory", "research-compact", "scientific-ml"],
+        )
+
+        with (ROOT / "capability-bundle.toml").open("rb") as handle:
+            components = tomllib.load(handle)["components"]
+        scientific = {
+            item["name"]: item
+            for item in components
+            if item["name"] in set(ecc["adaptations"])
+        }
+        self.assertEqual(set(scientific), set(ecc["adaptations"]))
+        for name, item in scientific.items():
+            self.assertEqual(item["kind"], "skill")
+            self.assertEqual(item["classification"], "supported")
+            self.assertEqual(item["path"], f"skills/{name}")
+            skill = ROOT / item["path"] / "SKILL.md"
+            self.assertEqual(frontmatter(skill)["name"], name)
+            text = skill.read_text(encoding="utf-8")
+            self.assertIn(ecc["commit"], text)
+            self.assertIn("Adapted", text)
+
+        forbidden_kinds = {"plugin", "hook", "command", "rule", "agent", "mcp", "dashboard", "runtime"}
+        self.assertFalse(
+            [item for item in components if item.get("source") == "ecc" and item["kind"] in forbidden_kinds]
+        )
+
+        bodies = {
+            name: (ROOT / item["path"] / "SKILL.md").read_text(encoding="utf-8")
+            for name, item in scientific.items()
+        }
+        self.assertIn("durable cited Markdown", bodies["scientific-research"])
+        self.assertIn("recorded verdict", bodies["research-eval"])
+        self.assertIn("unreviewed context", bodies["research-memory"])
+        self.assertIn("reference existing artifacts", bodies["research-compact"].lower())
+        self.assertIn("redact", bodies["research-compact"].lower())
+        self.assertIn("single question", bodies["scientific-ml"])
+        self.assertIn("reproduc", bodies["scientific-ml"].lower())
+
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for name in ecc["adaptations"]:
+            self.assertIn(f"`{name}`", readme)
+        self.assertIn("scripts/update.sh --review ecc", readme)
+        self.assertIn("never applies updates automatically", readme)
 
 
 class HookTests(unittest.TestCase):
@@ -437,6 +497,150 @@ class MergeAndBootstrapTests(unittest.TestCase):
             self.assertNotEqual(inferred.returncode, 0)
             self.assertIn("No Codex or Claude Code CLI found", inferred.stderr)
             self.assertFalse((home / ".claude").exists())
+
+
+class EccUpdateReviewTests(unittest.TestCase):
+    def git(self, repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    def make_upstream(self, root: Path) -> tuple[Path, str, str]:
+        repo = root / "ecc-upstream"
+        repo.mkdir()
+        self.git(repo, "init", "-b", "main")
+        self.git(repo, "config", "user.name", "ECC Test")
+        self.git(repo, "config", "user.email", "ecc-test@example.invalid")
+        adopted = repo / "skills/deep-research/SKILL.md"
+        adopted.parent.mkdir(parents=True)
+        adopted.write_text("version one\n", encoding="utf-8")
+        (repo / "README.md").write_text("unrelated one\n", encoding="utf-8")
+        self.git(repo, "add", ".")
+        self.git(repo, "commit", "-m", "initial")
+        pinned = self.git(repo, "rev-parse", "HEAD").stdout.strip()
+        adopted.write_text("version two\n", encoding="utf-8")
+        (repo / "README.md").write_text("unrelated two\n", encoding="utf-8")
+        self.git(repo, "add", ".")
+        self.git(repo, "commit", "-m", "update")
+        candidate = self.git(repo, "rev-parse", "HEAD").stdout.strip()
+        return repo, pinned, candidate
+
+    def write_lock(self, path: Path, repository: Path, commit: str, *, include_ecc: bool = True) -> None:
+        if include_ecc:
+            path.write_text(
+                "\n".join(
+                    (
+                        "version = 1",
+                        "[[sources]]",
+                        'name = "ecc"',
+                        f'repository = "{repository}"',
+                        f'commit = "{commit}"',
+                        'license = "MIT"',
+                        'items = ["deep-research", "eval-harness", "unified-memory", "strategic-compact", "mle-workflow"]',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        else:
+            path.write_text("version = 1\nsources = []\n", encoding="utf-8")
+
+    def test_review_reports_only_adopted_paths_without_mutating_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, pinned, candidate = self.make_upstream(root)
+            lock = root / "sources.lock.toml"
+            self.write_lock(lock, repo, pinned)
+            lock_before = lock.read_bytes()
+            status_before = self.git(repo, "status", "--porcelain=v1").stdout
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/review_ecc_updates.py"),
+                    "--lock",
+                    str(lock),
+                    "--candidate",
+                    candidate,
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(pinned, result.stdout)
+            self.assertIn(candidate, result.stdout)
+            self.assertIn("M\tskills/deep-research/SKILL.md", result.stdout)
+            self.assertNotIn("README.md", result.stdout)
+            self.assertIn("does not modify", result.stdout)
+            self.assertEqual(lock.read_bytes(), lock_before)
+            self.assertEqual(self.git(repo, "status", "--porcelain=v1").stdout, status_before)
+
+    def test_review_fails_closed_when_ecc_source_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lock = root / "sources.lock.toml"
+            self.write_lock(lock, root, "0" * 40, include_ecc=False)
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/review_ecc_updates.py"), "--lock", str(lock)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("ECC source", result.stderr)
+
+    def test_review_distinguishes_unrelated_only_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, pinned, _ = self.make_upstream(root)
+            (repo / "skills/deep-research/SKILL.md").write_text("version one\n", encoding="utf-8")
+            (repo / "README.md").write_text("unrelated three\n", encoding="utf-8")
+            self.git(repo, "add", ".")
+            self.git(repo, "commit", "-m", "unrelated only from pin")
+            candidate = self.git(repo, "rev-parse", "HEAD").stdout.strip()
+            lock = root / "sources.lock.toml"
+            self.write_lock(lock, repo, pinned)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/review_ecc_updates.py"),
+                    "--lock",
+                    str(lock),
+                    "--candidate",
+                    candidate,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("changed only outside", result.stdout)
+            self.assertNotIn("README.md", result.stdout)
+
+    def test_update_script_dispatches_ecc_review_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, pinned, candidate = self.make_upstream(root)
+            lock = root / "sources.lock.toml"
+            self.write_lock(lock, repo, pinned)
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(ROOT / "scripts/update.sh"),
+                    "--review",
+                    "ecc",
+                    "--lock",
+                    str(lock),
+                    "--candidate",
+                    candidate,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("skills/deep-research/SKILL.md", result.stdout)
 
 
 if __name__ == "__main__":

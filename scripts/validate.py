@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FABLE_AGENTS = {"Plan", "planner", "implementer-deep", "reviewer-deep", "security-reviewer"}
+OPUS_AGENTS = {"implementer", "implementer-fast", "implementer-standard", "implementer-deep"}
 
 
 def fail(message: str) -> None:
@@ -40,6 +40,8 @@ def load_object(path: Path) -> dict:
 
 def main() -> int:
     settings = load_object(ROOT / ".claude/settings.json")
+    if settings.get("model") != "claude-fable-5":
+        fail("Claude default model must be claude-fable-5")
     hooks = settings.get("hooks", {})
     if not isinstance(hooks, dict) or not {"SessionStart", "PreToolUse"} <= hooks.keys():
         fail("settings.json is missing required hooks")
@@ -60,7 +62,7 @@ def main() -> int:
         skill_names.add(name)
 
     agents = sorted((ROOT / ".claude/agents").glob("*.md"))
-    actual_fable: set[str] = set()
+    actual_opus: set[str] = set()
     for path in agents:
         metadata = parse_frontmatter(path)
         for field in ("name", "description", "model", "tools", "permissionMode"):
@@ -68,12 +70,12 @@ def main() -> int:
                 fail(f"{path.relative_to(ROOT)} missing {field}")
         name = metadata["name"]
         model = metadata["model"]
-        if model == "claude-fable-5":
-            actual_fable.add(name)
-        elif model != "claude-opus-5":
+        if model == "claude-opus-5":
+            actual_opus.add(name)
+        elif model != "claude-fable-5":
             fail(f"{name} uses unexpected model {model}")
-    if actual_fable != FABLE_AGENTS:
-        fail(f"Fable routing mismatch: {sorted(actual_fable)}")
+    if actual_opus != OPUS_AGENTS:
+        fail(f"Opus implementation routing mismatch: {sorted(actual_opus)}")
 
     with (ROOT / "capability-bundle.toml").open("rb") as handle:
         bundle = tomllib.load(handle)

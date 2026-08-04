@@ -1,7 +1,7 @@
 ---
 name: browser-debugger
 description: Browser-flow investigator that reproduces UI failures and gathers console, network, screenshot, and trace evidence without editing application code.
-model: claude-opus-5
+model: claude-fable-5
 tools: Read, Grep, Glob, Bash
 permissionMode: default
 ---

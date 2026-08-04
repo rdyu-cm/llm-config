@@ -106,9 +106,9 @@ manually.
 
 ## Models
 
-Main sessions and named agents use `claude-opus-5` by default. Five explicitly difficult roles use `claude-fable-5`: `planner`, `Plan`, `implementer-deep`, `reviewer-deep`, and `security-reviewer`.
+Main sessions and non-implementation named agents use `claude-fable-5` by default. The four file-modifying roles use `claude-opus-5`: `implementer`, `implementer-fast`, `implementer-standard`, and `implementer-deep`.
 
-`Plan` overrides Claude Code's built-in planning subagent, so planning delegated through either the built-in name or the portable `planner` name runs on Fable. Main sessions are still never instructed to switch their own model; `CLAUDE.global.md` routes planning work to those agents instead. Claude Code has no setting that changes the model used by plan mode itself — the only built-in variant is the `opusplan` alias (Opus while planning, Sonnet otherwise), which cannot express Opus-resting plus Fable-planning — so delegation is the supported mechanism.
+`Plan` overrides Claude Code's built-in planning subagent, so planning delegated through either the built-in name or the portable `planner` name stays on Fable. Main sessions do not switch models in place: `CLAUDE.global.md` routes approved file-modifying work to an Opus implementer while the Fable main session coordinates and verifies it. Claude Code has no setting that changes the model used by plan mode itself, so named-agent delegation is the supported routing mechanism.
 
 ## MCP servers
 

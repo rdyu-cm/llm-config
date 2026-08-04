@@ -68,19 +68,30 @@ class ConfigurationTests(unittest.TestCase):
         )
         self.assertIn("169.254.169.254", sandbox["network"]["deniedDomains"])
 
-    def test_models_are_routed_to_exact_named_roles(self) -> None:
+    def test_fable_is_default_and_implementation_uses_opus(self) -> None:
+        settings = json.loads((ROOT / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertEqual(settings["model"], "claude-fable-5")
         agents = {
             data["name"]: data
             for path in (ROOT / ".claude/agents").glob("*.md")
             if (data := frontmatter(path))
         }
-        fable = {name for name, data in agents.items() if data["model"] == "claude-fable-5"}
+        implementation = {
+            "implementer",
+            "implementer-fast",
+            "implementer-standard",
+            "implementer-deep",
+        }
         self.assertEqual(
-            fable,
-            {"Plan", "planner", "implementer-deep", "reviewer-deep", "security-reviewer"},
+            {name for name, data in agents.items() if data["model"] == "claude-opus-5"},
+            implementation,
         )
         self.assertTrue(
-            all(data["model"] == "claude-opus-5" for name, data in agents.items() if name not in fable)
+            all(
+                data["model"] == "claude-fable-5"
+                for name, data in agents.items()
+                if name not in implementation
+            )
         )
 
 

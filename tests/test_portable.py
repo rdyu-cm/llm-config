@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -114,6 +115,59 @@ class SharedSkillTests(unittest.TestCase):
         self.assertGreater(len(list((ROOT / "skills").glob("*/agents/openai.yaml"))), 0)
         self.assertGreater(len(list((ROOT / ".codex/agents").glob("*.toml"))), 0)
         self.assertGreater(len(list((ROOT / ".claude/agents").glob("*.md"))), 0)
+
+    def test_scientific_ecc_sources_are_narrow_and_pinned(self) -> None:
+        with (ROOT / "sources.lock.toml").open("rb") as handle:
+            sources = tomllib.load(handle)["sources"]
+        ecc = next((source for source in sources if source["name"] == "ecc"), None)
+        self.assertIsNotNone(ecc, "missing pinned ECC source")
+        self.assertEqual(ecc["repository"], "https://github.com/affaan-m/ECC")
+        self.assertRegex(ecc["commit"], r"^[0-9a-f]{40}$")
+        self.assertEqual(ecc["commit"], "7a5757e6c0d7e8e1080d30169b4b044d76e0f7fc")
+        self.assertEqual(ecc["license"], "MIT")
+        self.assertEqual(
+            ecc["items"],
+            ["deep-research", "eval-harness", "unified-memory", "strategic-compact", "mle-workflow"],
+        )
+        self.assertEqual(
+            ecc["adaptations"],
+            ["scientific-research", "research-eval", "research-memory", "research-compact", "scientific-ml"],
+        )
+
+        with (ROOT / "capability-bundle.toml").open("rb") as handle:
+            components = tomllib.load(handle)["components"]
+        scientific = {
+            item["name"]: item
+            for item in components
+            if item["name"] in set(ecc["adaptations"])
+        }
+        self.assertEqual(set(scientific), set(ecc["adaptations"]))
+        for name, item in scientific.items():
+            self.assertEqual(item["kind"], "skill")
+            self.assertEqual(item["classification"], "supported")
+            self.assertEqual(item["path"], f"skills/{name}")
+            skill = ROOT / item["path"] / "SKILL.md"
+            self.assertEqual(frontmatter(skill)["name"], name)
+            text = skill.read_text(encoding="utf-8")
+            self.assertIn(ecc["commit"], text)
+            self.assertIn("Adapted", text)
+
+        forbidden_kinds = {"plugin", "hook", "command", "rule", "agent", "mcp", "dashboard", "runtime"}
+        self.assertFalse(
+            [item for item in components if item.get("source") == "ecc" and item["kind"] in forbidden_kinds]
+        )
+
+        bodies = {
+            name: (ROOT / item["path"] / "SKILL.md").read_text(encoding="utf-8")
+            for name, item in scientific.items()
+        }
+        self.assertIn("durable cited Markdown", bodies["scientific-research"])
+        self.assertIn("recorded verdict", bodies["research-eval"])
+        self.assertIn("unreviewed context", bodies["research-memory"])
+        self.assertIn("reference existing artifacts", bodies["research-compact"].lower())
+        self.assertIn("redact", bodies["research-compact"].lower())
+        self.assertIn("single question", bodies["scientific-ml"])
+        self.assertIn("reproduc", bodies["scientific-ml"].lower())
 
 
 class HookTests(unittest.TestCase):

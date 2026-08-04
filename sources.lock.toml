@@ -56,3 +56,11 @@ repository = "https://github.com/DeusData/codebase-memory-mcp"
 commit = "2469ecc3a7a2f80debe296e1f17a1efcfdb9450c"
 license = "MIT"
 items = ["npm:codebase-memory-mcp@0.8.1"]
+
+[[sources]]
+name = "ecc"
+repository = "https://github.com/affaan-m/ECC"
+commit = "7a5757e6c0d7e8e1080d30169b4b044d76e0f7fc"
+license = "MIT"
+items = ["deep-research", "eval-harness", "unified-memory", "strategic-compact", "mle-workflow"]
+adaptations = ["scientific-research", "research-eval", "research-memory", "research-compact", "scientific-ml"]

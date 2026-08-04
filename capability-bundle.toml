@@ -164,6 +164,41 @@ path = "skills/project-health"
 classification = "supported"
 
 [[components]]
+name = "scientific-research"
+kind = "skill"
+path = "skills/scientific-research"
+classification = "supported"
+source = "ecc"
+
+[[components]]
+name = "research-eval"
+kind = "skill"
+path = "skills/research-eval"
+classification = "supported"
+source = "ecc"
+
+[[components]]
+name = "research-memory"
+kind = "skill"
+path = "skills/research-memory"
+classification = "supported"
+source = "ecc"
+
+[[components]]
+name = "research-compact"
+kind = "skill"
+path = "skills/research-compact"
+classification = "supported"
+source = "ecc"
+
+[[components]]
+name = "scientific-ml"
+kind = "skill"
+path = "skills/scientific-ml"
+classification = "supported"
+source = "ecc"
+
+[[components]]
 name = "superpowers"
 kind = "plugin"
 path = "plugins.lock.toml"

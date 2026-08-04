@@ -35,6 +35,12 @@ and retractions when practical, separates fact from inference, identifies contra
 evidence, and reports coverage gaps. It does not require Exa, Firecrawl, or any specific
 MCP. Available local, browser, and documentation tools are selected at runtime.
 
+Substantial research produces one durable cited Markdown artifact, stored where the
+project already keeps research notes or documentation. Chat-only delivery remains
+appropriate for small factual lookups. The workflow is complete only when every material
+claim in the durable artifact is traceable to a source and the search coverage and gaps
+are recorded.
+
 ### `research-eval`
 
 Adapt ECC's `eval-harness` concepts for reproducible scientific and computational
@@ -44,7 +50,9 @@ policy, uncertainty, subgroup analysis, and raw-result location.
 
 The workflow separates exploratory from confirmatory analysis, warns about multiple
 comparisons, and refuses to treat a single passing aggregate metric as sufficient evidence.
-It complements rather than replaces the repository's general verification skill.
+Every evaluation begins with one explicit question and ends with a recorded verdict that
+answers that question, including inconclusive outcomes. It complements rather than
+replaces the repository's general verification skill.
 
 ### `research-memory`
 
@@ -66,6 +74,10 @@ evidence, exclusions, experimental state, unresolved uncertainties, and next rep
 action. It is manually invoked or triggered by a request to prepare a handoff; no lifecycle
 hook injects it automatically.
 
+The compact references existing specs, experiment notes, datasets, commits, and results
+instead of duplicating them. It redacts credentials and sensitive participant or research
+data and names the skills likely needed for the next session.
+
 ### `scientific-ml`
 
 Adapt the research-relevant portion of ECC's `mle-workflow`. It focuses on dataset
@@ -76,7 +88,8 @@ reproduction instructions.
 Production serving, feature stores, canaries, online monitoring, and heavyweight MLOps are
 out of scope unless the user's project already contains those systems. The skill prefers
 the smallest experiment that can falsify the hypothesis and requires disclosure of
-hyperparameter search and selection effects.
+hyperparameter search and selection effects. Each experiment states the single question it
+answers and records a verdict before another experiment begins.
 
 ## Source Governance
 

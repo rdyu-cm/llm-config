@@ -1,6 +1,9 @@
-# Portable Agent Config
+# LLM Config for Codex and Claude Code
 
-An audited, repository-contained setup for **Codex and Claude Code** covering implementation, planning, debugging, review, frontend work, browser automation, and security analysis. Install either provider or both from one command; the skill library is shared, with provider differences documented inside each file rather than forked across two repositories.
+An audited, portable configuration for **OpenAI Codex and Anthropic Claude Code**. It
+provides one shared skill library plus provider-specific agents, settings, hooks, MCP
+servers, model routing, sandbox policy, and installation paths. Use either provider on its
+own or install both from the same checkout.
 
 The repository is the source of truth. Bootstrap is a non-mutating dry run by default. Apply mode installs a merged config per provider, links instructions, agents, hooks, and skills into that provider's discovery paths, and registers MCP servers the way that provider expects. Existing unmanaged files are reported as conflicts rather than overwritten.
 
@@ -8,16 +11,21 @@ Agents and skills are linked entry by entry rather than as whole directories, be
 
 ## Quick start
 
-Neither CLI is installed by this repository. Install at least one, then:
+Neither Codex nor Claude Code is installed by this repository. Install at least one CLI,
+then clone this repository into a durable location because the installed entries are
+symlinks back to the checkout:
 
 ```bash
-# Preflight, validate, apply, and verify. Installs for whichever CLIs are on PATH.
-./scripts/install.sh
+git clone https://github.com/rdyu-cm/llm-config.git ~/llms/llm-config
+cd ~/llms/llm-config
 
-# Pick a provider explicitly.
+# Install one provider or both.
 ./scripts/install.sh --target codex
 ./scripts/install.sh --target claude
 ./scripts/install.sh --target both
+
+# Alternatively, infer the target from whichever CLIs are currently on PATH.
+./scripts/install.sh
 
 # See what would change without touching your home directory.
 ./scripts/install.sh --dry-run
@@ -42,9 +50,9 @@ A link is adoptable only when it points into a predecessor checkout of this same
 
 The installed entries are symlinks into this repository, so the clone is a permanent dependency rather than a staging directory. Put it somewhere durable and identical across machines if you want the paths to match.
 
-```bash
-git clone <remote> ~/llms/llm-config && ~/llms/llm-config/scripts/install.sh
-```
+For a clean machine with both CLIs installed, the explicit command is
+`~/llms/llm-config/scripts/install.sh --target both`. Use `--adopt` only when migrating
+links created by the predecessor repositories; a clean machine does not need it.
 
 Requirements: Python 3.11 or newer (the validator imports `tomllib`), at least one of the Codex or Claude Code CLIs, and Git. Node and `npx` are needed only for the `codebase_memory` MCP server. On Linux, `bubblewrap` and `socat` enable the sandbox; without them Bash commands run unsandboxed and the install still succeeds.
 
@@ -53,6 +61,27 @@ Set `PYTHON` to select an interpreter when the default `python3` is older than 3
 ```bash
 PYTHON=/usr/bin/python3.11 ./scripts/install.sh
 ```
+
+### GitHub CLI (optional)
+
+Some review and CI skills use GitHub's `gh` CLI. Install `gh` separately using the
+[official platform instructions](https://github.com/cli/cli#installation), then authenticate
+it without placing a token in this repository:
+
+```bash
+gh auth login --hostname github.com --git-protocol ssh --web
+gh auth status
+```
+
+Recent versions of `gh` also publish an optional skill that teaches supported coding agents
+how to drive the CLI. User scope is recommended because the CLI is useful across repositories:
+
+```bash
+gh skill install cli/cli gh --scope user
+```
+
+This command installs agent instructions, not the `gh` executable, and therefore only works
+after the CLI itself is installed. Update the skill independently with `gh skill update gh`.
 
 ## Layout
 
@@ -77,21 +106,72 @@ Codex:
 
 `scripts/` holds the dry-run-first installer, bootstrap, validation, health checks, and update checks.
 
-## Scientific research
+## Workflows and skills
+
+Skills are selected when their descriptions match the task; they are not all run for every
+request. The usual development path is:
+
+| Stage | Workflow |
+| --- | --- |
+| Understand | `brainstorming` resolves material design choices; `writing-plans` turns an approved design into executable steps. |
+| Isolate | `using-git-worktrees` protects the current branch before tracked changes. |
+| Implement | `test-driven-development` drives focused changes; `executing-plans` or `subagent-driven-development` handles approved multi-step work. |
+| Diagnose | `systematic-debugging` reproduces failures and identifies causes before fixes; `playwright` captures browser evidence. |
+| Review | `requesting-code-review`, `receiving-code-review`, and the reviewer agents check correctness, risk, and feedback. |
+| Verify and finish | `verification-before-completion` requires fresh evidence; `finishing-a-development-branch` offers merge, PR, keep, or cleanup choices. |
+
+The installed skill library is grouped below. Shared skills include provider-specific
+guidance where the two CLIs differ.
+
+### Development and maintenance
+
+- `brainstorming`: clarify requirements and consequential design choices.
+- `writing-plans`: produce a file-oriented implementation plan from an approved design.
+- `executing-plans`: execute a written plan with review checkpoints.
+- `subagent-driven-development`: coordinate independent implementation slices when delegation is requested.
+- `test-driven-development`: establish failing coverage before feature or bug-fix code.
+- `systematic-debugging`: reproduce unexpected behavior and isolate its cause.
+- `using-git-worktrees`: create an isolated branch workspace for tracked changes.
+- `verification-before-completion`: require fresh test, lint, type, or smoke-check evidence.
+- `finishing-a-development-branch`: guide local merge, pull request, preservation, or cleanup.
+- `project-health`: run and report a repository's native verification suite without modifying it.
+- `explain-as-you-go`: add concise teaching commentary when explicitly requested.
+- `modern-python`: configure Python projects around `uv`, Ruff, and ty.
+- `cli-creator`: turn APIs, specifications, or scripts into composable command-line tools.
+
+### Review, GitHub, and security
+
+- `requesting-code-review`: request a structured final review before integration.
+- `receiving-code-review`: validate review feedback before applying it.
+- `differential-review`: security-focused review of commits, diffs, and blast radius.
+- `gh-address-comments`: inspect and address comments on the current GitHub pull request.
+- `gh-fix-ci`: diagnose GitHub Actions failures and propose a fix before editing.
+- `agentic-actions-auditor`: find prompt-injection paths and unsafe permissions in AI-enabled Actions workflows.
+- `insecure-defaults`: detect fail-open configuration, weak authentication, and embedded secrets.
+- `sharp-edges`: identify APIs and configuration designs that are easy to misuse.
+- `supply-chain-risk-auditor`: assess dependencies for takeover and ecosystem risk.
+- `property-based-testing`: strengthen parsers, validation, serialization, and invariant-heavy code with generated tests.
+
+### Frontend and browser work
+
+- `impeccable`: design or audit frontend UX, visual hierarchy, accessibility, responsiveness, and polish.
+- `playwright`: automate real browser flows, screenshots, traces, and data extraction.
+- `vercel-react-best-practices`: improve React and Next.js performance and data-loading patterns.
+- `vercel-composition-patterns`: build scalable React APIs with composition instead of proliferating flags.
+
+### Scientific research
+
+- `scientific-research`: synthesize primary literature, authoritative datasets, and standards with citations.
+- `research-eval`: design reproducible benchmarks, metrics, comparisons, and uncertainty analysis.
+- `research-memory`: preserve inspectable sources, experiments, decisions, negative results, and handoffs.
+- `research-compact`: create evidence-linked continuation records before context loss or handoff.
+- `scientific-ml`: run hypothesis-driven ML experiments with provenance, leakage controls, baselines, ablations, and reproducible artifacts.
+
+## ECC provenance and updates
 
 Five shared skills adapt a narrow, audited subset of ECC for both providers without
 installing ECC's plugin, agents, commands, hooks, rules, dashboard, memory runtime, or MCP
-servers:
-
-- `scientific-research`: primary-source discovery, evidence assessment, cited synthesis,
-  and durable research artifacts.
-- `research-eval`: reproducible evaluation contracts, uncertainty, subgroup analysis, and
-  explicit verdicts.
-- `research-memory`: inspectable source, experiment, decision, negative-result, question,
-  and handoff notes with an unreviewed-context trust boundary.
-- `research-compact`: evidence-linked, redacted continuation records for long sessions.
-- `scientific-ml`: hypothesis-driven ML experiments with provenance, leakage controls,
-  baselines, ablations, uncertainty, and reproducible artifacts.
+servers. Their user-facing descriptions are listed above.
 
 ECC is pinned in `sources.lock.toml`. The normal update check reports when that repository
 moves. To inspect only changes under the five upstream workflows used by these adaptations:
@@ -106,9 +186,15 @@ manually.
 
 ## Models
 
-Main sessions and non-implementation named agents use `claude-fable-5` by default. The four file-modifying roles use `claude-opus-5`: `implementer`, `implementer-fast`, `implementer-standard`, and `implementer-deep`.
+Claude Code main sessions and non-implementation named agents use `claude-fable-5` by
+default. The four file-modifying roles use `claude-opus-5`: `implementer`,
+`implementer-fast`, `implementer-standard`, and `implementer-deep`.
 
 `Plan` overrides Claude Code's built-in planning subagent, so planning delegated through either the built-in name or the portable `planner` name stays on Fable. Main sessions do not switch models in place: `CLAUDE.global.md` routes approved file-modifying work to an Opus implementer while the Fable main session coordinates and verifies it. Claude Code has no setting that changes the model used by plan mode itself, so named-agent delegation is the supported routing mechanism.
+
+Codex main sessions inherit the model selected by the installed Codex CLI. Named planning,
+review, and security agents use `gpt-5.6-sol`; routine implementers use `gpt-5.6-terra`,
+while `implementer-deep` uses `gpt-5.6-sol`.
 
 ## MCP servers
 

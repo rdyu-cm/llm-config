@@ -40,8 +40,10 @@ def load_object(path: Path) -> dict:
 
 def main() -> int:
     settings = load_object(ROOT / ".claude/settings.json")
-    if settings.get("model") != "claude-fable-5":
-        fail("Claude default model must be claude-fable-5")
+    if settings.get("model") != "claude-opus-5":
+        fail("Claude default model must be claude-opus-5")
+    if settings.get("effortLevel") != "high":
+        fail("Claude default effortLevel must be high")
     hooks = settings.get("hooks", {})
     if not isinstance(hooks, dict) or not {"SessionStart", "PreToolUse"} <= hooks.keys():
         fail("settings.json is missing required hooks")

@@ -186,11 +186,13 @@ manually.
 
 ## Models
 
-Claude Code main sessions and non-implementation named agents use `claude-fable-5` by
-default. The four file-modifying roles use `claude-opus-5`: `implementer`,
-`implementer-fast`, `implementer-standard`, and `implementer-deep`.
+Claude Code main sessions default to `claude-opus-5` at high reasoning effort
+(`effortLevel: high`). Planning switches to Fable: the `Plan` and `planner` agents pin
+`claude-fable-5` and inherit the session's high effort. The other non-implementation named
+agents also use `claude-fable-5`, and the four file-modifying roles use `claude-opus-5`:
+`implementer`, `implementer-fast`, `implementer-standard`, and `implementer-deep`.
 
-`Plan` overrides Claude Code's built-in planning subagent, so planning delegated through either the built-in name or the portable `planner` name stays on Fable. Main sessions do not switch models in place: `CLAUDE.global.md` routes approved file-modifying work to an Opus implementer while the Fable main session coordinates and verifies it. Claude Code has no setting that changes the model used by plan mode itself, so named-agent delegation is the supported routing mechanism.
+`Plan` overrides Claude Code's built-in planning subagent, so planning delegated through either the built-in name or the portable `planner` name switches to Fable. Main sessions do not switch models in place: `CLAUDE.global.md` routes planning to a Fable agent and approved file-modifying work to an Opus implementer while the main session coordinates and verifies it. Claude Code has no setting that changes the model used by plan mode itself (the built-in `opusplan` alias is a fixed Opus/Sonnet pairing), so named-agent delegation is the supported routing mechanism.
 
 Codex main sessions inherit the model selected by the installed Codex CLI. Named planning,
 review, and security agents use `gpt-5.6-sol`; routine implementers use `gpt-5.6-terra`,

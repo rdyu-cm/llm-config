@@ -138,8 +138,8 @@ For every dispatch, use Claude Code’s `Agent` tool with a self-contained promp
 | --- | --- | --- |
 | Complete specification, isolated change, one or two files | `implementer-fast` | `claude-opus-5` |
 | Multi-file integration, pattern matching, or debugging | `implementer-standard` | `claude-opus-5` |
-| Broad architectural context or substantial design judgment | `implementer-deep` | `claude-fable-5` |
-| Small or routine task review | `reviewer-standard` | `claude-opus-5` |
+| Broad architectural context or substantial design judgment | `implementer-deep` | `claude-opus-5` |
+| Small or routine task review | `reviewer-standard` | `claude-fable-5` |
 | Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer-deep` | `claude-fable-5` |
 
 ### Codex Agent Tiers

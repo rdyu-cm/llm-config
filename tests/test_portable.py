@@ -68,9 +68,10 @@ class ConfigurationTests(unittest.TestCase):
         )
         self.assertIn("169.254.169.254", sandbox["network"]["deniedDomains"])
 
-    def test_fable_is_default_and_implementation_uses_opus(self) -> None:
+    def test_opus_is_default_and_planning_agents_use_fable(self) -> None:
         settings = json.loads((ROOT / ".claude/settings.json").read_text(encoding="utf-8"))
-        self.assertEqual(settings["model"], "claude-fable-5")
+        self.assertEqual(settings["model"], "claude-opus-5")
+        self.assertEqual(settings["effortLevel"], "high")
         agents = {
             data["name"]: data
             for path in (ROOT / ".claude/agents").glob("*.md")

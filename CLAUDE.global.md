@@ -17,7 +17,7 @@ Keep changes small, evidence-driven, and directly tied to the request.
 - Use `brainstorming` when a change has material product, architecture, interface, or behavior choices.
 - Use `writing-plans` for an approved design that requires multi-step implementation.
 - Do not run overlapping planning workflows by default.
-- Main sessions and non-implementation agents run on Fable and must not switch models. When a task needs a real plan — architecture, sequencing, risk, or verification strategy — delegate to the `planner` or `Plan` agent instead of planning inline, and treat the returned plan as input rather than as an approved decision. Route approved file-modifying work to `implementer-fast`, `implementer-standard`, `implementer-deep`, or `implementer`, which run on Opus; the Fable main session coordinates and verifies the result.
+- Main sessions default to Opus 5 at high reasoning effort and must not switch models in place. When a task needs a real plan — architecture, sequencing, risk, or verification strategy — delegate to the `planner` or `Plan` agent, which run on Fable 5 at the session's high effort, instead of planning inline, and treat the returned plan as input rather than as an approved decision. Route approved file-modifying work to `implementer-fast`, `implementer-standard`, `implementer-deep`, or `implementer`, which run on Opus; the main session coordinates and verifies the result.
 
 ## Worktrees
 

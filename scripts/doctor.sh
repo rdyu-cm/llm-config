@@ -53,6 +53,27 @@ else
   failures=$((failures + 1))
 fi
 
+# Reporting only that a tool is missing leaves the reader to work out the package
+# name, which differs from the binary for bubblewrap, and the command, which differs
+# per distribution. The hint is omitted rather than guessed when no manager matches.
+install_hint() {
+  case $1 in
+    bwrap) package=bubblewrap ;;
+    *) package=$1 ;;
+  esac
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "sudo apt install $package"
+  elif command -v dnf >/dev/null 2>&1; then
+    echo "sudo dnf install $package"
+  elif command -v pacman >/dev/null 2>&1; then
+    echo "sudo pacman -S $package"
+  elif command -v zypper >/dev/null 2>&1; then
+    echo "sudo zypper install $package"
+  elif command -v apk >/dev/null 2>&1; then
+    echo "sudo apk add $package"
+  fi
+}
+
 # The sandbox degrades to a warning rather than failing when dependencies are
 # missing, so a missing tool is reported as optional rather than as a failure.
 case "$(uname -s)" in
@@ -62,6 +83,10 @@ case "$(uname -s)" in
         echo "ok      sandbox dependency $tool: $(command -v "$tool")"
       else
         echo "optional sandbox dependency $tool is missing; Bash commands will run unsandboxed"
+        hint=$(install_hint "$tool")
+        if [ -n "$hint" ]; then
+          echo "        install with: $hint"
+        fi
       fi
     done
     ;;

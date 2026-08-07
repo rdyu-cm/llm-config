@@ -54,7 +54,7 @@ For a clean machine with both CLIs installed, the explicit command is
 `~/llms/llm-config/scripts/install.sh --target both`. Use `--adopt` only when migrating
 links created by the predecessor repositories; a clean machine does not need it.
 
-Requirements: Python 3.11 or newer (the validator imports `tomllib`), at least one of the Codex or Claude Code CLIs, and Git. Node and `npx` are needed only for the `codebase_memory` MCP server. On Linux, `bubblewrap` and `socat` enable the sandbox; without them Bash commands run unsandboxed and the install still succeeds.
+Requirements: Python 3.11 or newer (the validator imports `tomllib`), at least one of the Codex or Claude Code CLIs, and Git. Node and `npx` are needed only for the `codebase_memory` MCP server. On Linux, `bubblewrap` and `socat` enable the sandbox; without them Bash commands run unsandboxed and the install still succeeds. `./scripts/doctor.sh` names whichever is missing and prints the install command for the detected package manager; installing it is left to you, because that is the one step needing root.
 
 Set `PYTHON` to select an interpreter when the default `python3` is older than 3.11:
 

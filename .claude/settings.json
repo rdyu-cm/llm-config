@@ -4,7 +4,7 @@
   "effortLevel": "high",
   "attribution": {"commit": "", "pr": ""},
   "permissions": {
-    "defaultMode": "default",
+    "defaultMode": "auto",
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",

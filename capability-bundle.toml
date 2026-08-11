@@ -199,6 +199,12 @@ classification = "supported"
 source = "ecc"
 
 [[components]]
+name = "slurm-right-sizing"
+kind = "skill"
+path = "skills/slurm-right-sizing"
+classification = "supported"
+
+[[components]]
 name = "superpowers"
 kind = "plugin"
 path = "plugins.lock.toml"

@@ -130,6 +130,7 @@ guidance where the two CLIs differ.
 - `executing-plans`: execute a written plan with review checkpoints.
 - `subagent-driven-development`: coordinate independent implementation slices when delegation is requested.
 - `test-driven-development`: establish failing coverage before feature or bug-fix code.
+- `unit-test-design`: choose the behavior, inputs, and assertions that make a unit test able to fail.
 - `systematic-debugging`: reproduce unexpected behavior and isolate its cause.
 - `using-git-worktrees`: create an isolated branch workspace for tracked changes.
 - `verification-before-completion`: require fresh test, lint, type, or smoke-check evidence.

@@ -205,6 +205,12 @@ path = "skills/slurm-right-sizing"
 classification = "supported"
 
 [[components]]
+name = "unit-test-design"
+kind = "skill"
+path = "skills/unit-test-design"
+classification = "supported"
+
+[[components]]
 name = "superpowers"
 kind = "plugin"
 path = "plugins.lock.toml"

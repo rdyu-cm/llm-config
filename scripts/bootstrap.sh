@@ -262,12 +262,25 @@ install_mcp() {
     echo "Claude Code CLI is required to register MCP servers; install it and rerun." >&2
     return 1
   }
-  claude mcp add --transport http --scope user context7 https://mcp.context7.com/mcp
-  claude mcp add --transport stdio --scope user codebase_memory -- npx -y codebase-memory-mcp@0.8.1
+  # `claude mcp add` refuses a name it already knows, so an unguarded add turns
+  # every rerun into a failure. Skipping an already-registered name also leaves
+  # a server the user re-pointed by hand alone, which an overwrite would not.
+  registered() { claude mcp get "$1" >/dev/null 2>&1; }
+  registered context7 \
+    || claude mcp add --transport http --scope user context7 https://mcp.context7.com/mcp \
+    || return 1
+  registered codebase_memory \
+    || claude mcp add --transport stdio --scope user codebase_memory -- npx -y codebase-memory-mcp@0.8.1 \
+    || return 1
   if [ -n "${GITHUB_PAT_TOKEN:-}" ]; then
-    claude mcp add-json --scope user github \
-      '{"type":"http","url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${GITHUB_PAT_TOKEN}"}}'
+    registered github \
+      || claude mcp add-json --scope user github \
+        '{"type":"http","url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${GITHUB_PAT_TOKEN}"}}' \
+      || return 1
   fi
+  # An explicit status: the preceding `if` would otherwise decide the function's
+  # exit code by whether the token happened to be set.
+  return 0
 }
 
 install_target() {

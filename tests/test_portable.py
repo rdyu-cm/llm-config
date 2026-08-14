@@ -12,6 +12,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SHARED_BEGIN = "<!-- shared:begin — identical in CLAUDE.global.md and AGENTS.global.md; tests enforce it -->"
+SHARED_END = "<!-- shared:end -->"
 
 
 def frontmatter(path: Path) -> dict[str, str]:
@@ -114,6 +116,26 @@ class SharedSkillTests(unittest.TestCase):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 self.assertIn("Codex", text)
                 self.assertIn("Claude Code", text)
+
+    def test_shared_instruction_block_is_identical_across_providers(self) -> None:
+        # The two global instruction files are one rule set maintained twice.
+        # They must diverge only where the provider genuinely differs, and an
+        # edit applied to one file and forgotten in the other is invisible
+        # unless something compares them.
+        self.maxDiff = None  # the drifted line is the whole point of the failure
+        blocks = {}
+        for name in ("CLAUDE.global.md", "AGENTS.global.md"):
+            text = (ROOT / name).read_text(encoding="utf-8")
+            for marker in (SHARED_BEGIN, SHARED_END):
+                self.assertEqual(text.count(marker), 1, f"{name} needs exactly one {marker}")
+            blocks[name] = text.split(SHARED_BEGIN, 1)[1].split(SHARED_END, 1)[0]
+        self.assertEqual(
+            blocks["CLAUDE.global.md"],
+            blocks["AGENTS.global.md"],
+            "provider-neutral instructions drifted; edit both files or move the line outside the markers",
+        )
+        # Emptying the block is the other way to make this test pass.
+        self.assertGreater(len(blocks["CLAUDE.global.md"].strip().splitlines()), 5)
 
     def test_no_skill_is_duplicated_per_provider(self) -> None:
         skills = {path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")}
@@ -412,6 +434,62 @@ class MergeAndBootstrapTests(unittest.TestCase):
                 for path in expected[target]:
                     self.assertTrue((home / path).exists(), f"{path} missing for {target}")
                 self.assertFalse((home / other[target]).exists(), "the other provider was touched")
+
+    def stub_claude_with_mcp_registry(self, root: Path) -> Path:
+        # `claude mcp add` refuses a name it already registered, so the stub has
+        # to reproduce that refusal for a rerun test to mean anything.
+        bin_dir = self.stub_clis(root)
+        (bin_dir / "claude").write_text(
+            "#!/bin/sh\n"
+            'registry="$HOME/mcp-servers"\n'
+            '[ "$1" = mcp ] || exit 0\n'
+            'action=$2\n'
+            'shift 2\n'
+            'name=""\n'
+            'for arg in "$@"; do\n'
+            '  case "$arg" in context7|codebase_memory|github) name=$arg ;; esac\n'
+            'done\n'
+            'case "$action" in\n'
+            '  get) grep -qx "$name" "$registry" 2>/dev/null || exit 1 ;;\n'
+            '  add|add-json)\n'
+            '    if grep -qx "$name" "$registry" 2>/dev/null; then\n'
+            '      echo "MCP server $name already exists in user config" >&2\n'
+            "      exit 1\n"
+            "    fi\n"
+            '    echo "$name" >> "$registry" ;;\n'
+            "esac\n"
+        )
+        (bin_dir / "claude").chmod(0o755)
+        return bin_dir
+
+    def test_rerunning_an_install_does_not_re_add_mcp_servers(self) -> None:
+        # A machine that gains the second CLI later reruns the same install, and
+        # the github server is only reached when the token is set, so an
+        # unguarded add fails the rerun exactly on the machines that configured
+        # the most.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            home.mkdir()
+            stubs = self.stub_claude_with_mcp_registry(root)
+            env = {
+                **os.environ,
+                "HOME": str(home),
+                "PATH": f"{stubs}:{os.environ['PATH']}",
+                "PYTHON": sys.executable,
+                "GITHUB_PAT_TOKEN": "token",
+            }
+            command = ["bash", str(ROOT / "scripts/bootstrap.sh"), "--apply", "--target", "claude"]
+
+            first = subprocess.run(command, env=env, capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            registered = (home / "mcp-servers").read_text().split()
+            self.assertEqual(registered, ["context7", "codebase_memory", "github"])
+
+            second = subprocess.run(command, env=env, capture_output=True, text=True)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertNotIn("already exists", second.stderr)
+            self.assertEqual((home / "mcp-servers").read_text().split(), registered)
 
     def test_a_whole_directory_link_is_never_written_through(self) -> None:
         # An older layout linked ~/.agents/skills as one directory. Descending

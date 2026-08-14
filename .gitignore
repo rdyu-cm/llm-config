@@ -10,3 +10,4 @@ __pycache__/
 .worktrees/
 output/
 .claude/settings.generated.json
+.codex/config.generated.toml

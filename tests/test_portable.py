@@ -46,6 +46,22 @@ class ConfigurationTests(unittest.TestCase):
         for path in profiles:
             self.assertIsInstance(json.loads(path.read_text(encoding="utf-8")), dict)
 
+    def test_neither_provider_tracks_its_generated_config(self) -> None:
+        # Apply rewrites both generated files, and each provider writes machine
+        # state (absolute paths, hook trust hashes) into its own active config
+        # that the next apply folds back in. Tracking either one turns a routine
+        # rerun into a dirty worktree on every cluster.
+        tracked = subprocess.run(
+            ["git", "ls-files", ".codex/config.generated.toml", ".claude/settings.generated.json"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(tracked.stdout.strip(), "", "a generated config is tracked")
+        ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").split()
+        for name in (".codex/config.generated.toml", ".claude/settings.generated.json"):
+            self.assertIn(name, ignored)
+
     def test_required_hooks_are_configured(self) -> None:
         settings = json.loads((ROOT / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertEqual(set(settings["hooks"]), {"SessionStart", "PreToolUse"})

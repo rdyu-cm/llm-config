@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Block a small set of unambiguously destructive shell commands."""
 
-from __future__ import annotations
-
 import json
 import re
 import sys

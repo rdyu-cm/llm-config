@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 *.local
+*.local.json
 *.bak
 __pycache__/
 *.pyc

@@ -181,7 +181,19 @@ link_children() {
   # link is resolved first and never followed.
   if [ -L "$target_dir" ]; then
     current=$(readlink "$target_dir")
-    if [ "$current" = "$source_dir" ] || is_predecessor "$current"; then
+    if [ "$current" = "$source_dir" ]; then
+      # Our own whole-directory link, from the layout that predates per-entry
+      # linking. Replacing it with one link per entry into that same directory
+      # resolves to identical content, so it is a layout migration rather than
+      # an adoption and must not demand --adopt from an up-to-date machine.
+      if [ "$APPLY" = true ]; then
+        rm -f "$target_dir"
+        echo "migrated $target_dir (was a whole-directory link)"
+      else
+        echo "would   migrate $target_dir (whole-directory link)"
+        return 0
+      fi
+    elif is_predecessor "$current"; then
       adoptions=$((adoptions + 1))
       if [ "$ADOPT" != true ]; then
         echo "adoptable $target_dir -> $current (whole-directory link)" >&2
@@ -296,22 +308,38 @@ install_target() {
     return 1
   fi
 
-  install_config || return 1
+  # The links are established before the config that refers to them. The config
+  # declares hooks by path, so installing it while a link is unresolved leaves
+  # the provider pointing at scripts that are not there -- and a PreToolUse hook
+  # whose interpreter cannot open its script exits 2, which the provider reads
+  # as "deny this tool call". A half-applied install is therefore not a degraded
+  # install but an unusable one, so a conflict here has to stop the config from
+  # landing at all rather than be reported alongside it.
+  target_conflicts=0
 
   instructions=$(provider_instructions)
-  link_item "${instructions%%:*}" "${instructions##*:}" || conflicts=$((conflicts + 1))
-  link_item "$(provider_hooks)" "$(provider_home)/hooks" || conflicts=$((conflicts + 1))
-  link_children "$(provider_agents)" "$(provider_home)/agents" || conflicts=$((conflicts + 1))
-  link_children "$ROOT/skills" "$(provider_skills)" || conflicts=$((conflicts + 1))
+  link_item "${instructions%%:*}" "${instructions##*:}" || target_conflicts=$((target_conflicts + 1))
+  link_children "$(provider_hooks)" "$(provider_home)/hooks" || target_conflicts=$((target_conflicts + 1))
+  link_children "$(provider_agents)" "$(provider_home)/agents" || target_conflicts=$((target_conflicts + 1))
+  link_children "$ROOT/skills" "$(provider_skills)" || target_conflicts=$((target_conflicts + 1))
 
   if [ "$TARGET" = codex ]; then
-    link_item "$ROOT/.codex/hooks.json" "$(provider_home)/hooks.json" || conflicts=$((conflicts + 1))
+    link_item "$ROOT/.codex/hooks.json" "$(provider_home)/hooks.json" || target_conflicts=$((target_conflicts + 1))
     for profile in "$ROOT"/profiles/*.config.toml; do
       [ -e "$profile" ] || continue
-      link_item "$profile" "$(provider_home)/$(basename -- "$profile")" || conflicts=$((conflicts + 1))
+      link_item "$profile" "$(provider_home)/$(basename -- "$profile")" || target_conflicts=$((target_conflicts + 1))
     done
   fi
 
+  if [ "$target_conflicts" -ne 0 ]; then
+    conflicts=$((conflicts + target_conflicts))
+    # Returning 0 keeps the remaining target in a --target both run from being
+    # skipped; the accumulated count still fails the run at the end.
+    echo "skipped $(provider_config); its links did not resolve (see above)" >&2
+    return 0
+  fi
+
+  install_config || return 1
   install_mcp || return 1
 }
 
@@ -327,7 +355,7 @@ done
 
 echo
 if [ "$conflicts" -ne 0 ]; then
-  echo "Found $conflicts conflict(s); nothing was overwritten." >&2
+  echo "Found $conflicts conflict(s); nothing was overwritten and no config was installed." >&2
   if [ "$adoptions" -ne 0 ] && [ "$ADOPT" != true ]; then
     echo "$adoptions of them point into a predecessor checkout of this configuration." >&2
     echo "Rerun with --adopt to repoint those and leave the rest untouched." >&2

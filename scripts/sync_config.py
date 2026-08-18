@@ -58,6 +58,37 @@ def union(local: list, portable: list) -> list:
     return result
 
 
+def subtract(carried: dict, portable: dict) -> dict:
+    """Keep only what the portable layer does not already provide.
+
+    Folding a whole unmanaged config into the overlay absorbs the portable
+    layer into it permanently: `union` then keeps those entries even after the
+    repository changes them, so a renamed hook script survives as an extra
+    declaration pointing at a file that is gone. The subtraction has to reach
+    the leaves, because the portable layer owns containers -- `permissions` --
+    whose contents are genuinely machine-local and must survive.
+
+    A scalar the portable layer also sets is dropped whatever its value, since
+    `merge` lets the portable side win: carrying it changes nothing and only
+    misrepresents it as a local preference.
+    """
+    result = {}
+    for key, value in carried.items():
+        if key not in portable:
+            result[key] = copy.deepcopy(value)
+            continue
+        other = portable[key]
+        if isinstance(value, dict) and isinstance(other, dict):
+            nested = subtract(value, other)
+            if nested:
+                result[key] = nested
+        elif isinstance(value, list) and isinstance(other, list):
+            kept = [entry for entry in value if entry not in other]
+            if kept:
+                result[key] = copy.deepcopy(kept)
+    return result
+
+
 def merge(local: dict, portable: dict) -> dict:
     result = copy.deepcopy(local)
     for key, value in portable.items():
@@ -153,13 +184,21 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     overlay = load(args.local, required=False)
+    portable = load(args.base, required=True)
     if args.carry is not None and not args.check:
-        carried = merge(load(args.carry, required=False), overlay)
+        # Whatever this repository installed last time is managed, even where
+        # the portable layer has since changed it -- otherwise the previous
+        # version of a renamed entry reads as machine-local and is preserved
+        # forever. The portable layer is the fallback for the first install,
+        # when no marker exists yet.
+        managed = load(args.output, required=False) or portable
+        unmanaged = subtract(load(args.carry, required=False), managed)
+        carried = merge(unmanaged, overlay)
         if carried != overlay:
             write(args.local, carried)
             print(f"carried {args.carry} into {args.local}")
         overlay = carried
-    expected_data = merge(overlay, load(args.base, required=True))
+    expected_data = merge(overlay, portable)
     if args.check:
         if load(args.output, required=False) != expected_data:
             print(f"stale   {args.output}; run scripts/bootstrap.sh --apply", file=sys.stderr)

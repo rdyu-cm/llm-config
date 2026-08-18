@@ -355,6 +355,81 @@ class MergeAndBootstrapTests(unittest.TestCase):
             self.assertEqual(merged["model"], "claude-opus-5")
             self.assertEqual(merged["statusLine"], {"type": "command"})
 
+    def test_carry_leaves_portable_entries_out_of_the_overlay(self) -> None:
+        # Folding the whole installed config in absorbs the portable layer into
+        # the overlay, where union keeps it alive after the repository changes
+        # it. Only what the portable layer does not provide may be carried.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            base, local, carry, output = (root / f"{n}.json" for n in ("base", "local", "carry", "out"))
+            portable_hook = {"matcher": "Bash", "hooks": [{"command": "policy.py"}]}
+            local_hook = {"matcher": "Bash", "hooks": [{"command": "agent-session"}]}
+            base.write_text(json.dumps({
+                "hooks": {"PreToolUse": [portable_hook]},
+                "permissions": {"deny": ["Bash(rm:*)"]},
+            }))
+            local.write_text("{}")
+            # What a real installed settings.json looks like: the portable
+            # layer, plus grants and handlers this machine added.
+            carry.write_text(json.dumps({
+                "hooks": {"PreToolUse": [portable_hook, local_hook]},
+                "permissions": {"deny": ["Bash(rm:*)"], "allow": ["Bash(ls:*)"]},
+                "autoMode": {"soft_deny": []},
+            }))
+            self.run_sync(base, local, output, carry=carry)
+
+            overlay = json.loads(local.read_text(encoding="utf-8"))
+            self.assertEqual(overlay["hooks"]["PreToolUse"], [local_hook], "absorbed the portable hook")
+            self.assertNotIn("deny", overlay["permissions"], "absorbed the portable deny list")
+            # Genuinely machine-local content nested under a portable container
+            # has to survive, or the machine loses its accumulated grants.
+            self.assertEqual(overlay["permissions"]["allow"], ["Bash(ls:*)"])
+            self.assertEqual(overlay["autoMode"], {"soft_deny": []})
+
+            merged = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(merged["hooks"]["PreToolUse"], [local_hook, portable_hook])
+
+    def test_carry_drops_the_previous_version_of_a_renamed_entry(self) -> None:
+        # The regression this guards: a renamed hook script leaves the old
+        # declaration in the installed config. Carried as machine-local, it
+        # survives into the merged output pointing at a file that is gone --
+        # and a PreToolUse hook whose script cannot be opened exits 2, which
+        # Claude Code reads as "deny this tool call".
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            base, local, carry, output = (root / f"{n}.json" for n in ("base", "local", "carry", "out"))
+            old = {"matcher": "Bash", "hooks": [{"command": "policy.py"}]}
+            new = {"matcher": "Bash", "hooks": [{"command": "policy_v2.py"}]}
+            # The marker records what the previous install actually wrote.
+            output.write_text(json.dumps({"hooks": {"PreToolUse": [old]}}))
+            base.write_text(json.dumps({"hooks": {"PreToolUse": [new]}}))
+            local.write_text("{}")
+            carry.write_text(json.dumps({"hooks": {"PreToolUse": [old]}, "theme": "dark"}))
+            self.run_sync(base, local, output, carry=carry)
+
+            overlay = json.loads(local.read_text(encoding="utf-8"))
+            self.assertNotIn("hooks", overlay, "kept the superseded hook as machine-local")
+            self.assertEqual(overlay["theme"], "dark", "dropped genuinely unmanaged content")
+            merged = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(merged["hooks"]["PreToolUse"], [new])
+
+    def test_the_generated_marker_is_written_to_the_home_not_the_checkout(self) -> None:
+        # The marker describes one home's install. Kept in the checkout it was
+        # shared by every home installed from it, so running the tests left it
+        # describing a throwaway home and the next real apply saw the live
+        # config as unmanaged.
+        stale = ROOT / ".claude/settings.generated.json"
+        before = stale.read_bytes() if stale.exists() else None
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            home.mkdir()
+            result = self.bootstrap(home, "--apply", "--target", "claude", stubs=self.stub_clis(root))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((home / ".claude/settings.generated.json").exists())
+        after = stale.read_bytes() if stale.exists() else None
+        self.assertEqual(before, after, "the test suite wrote into the checkout")
+
     def run_sync(self, base: Path, local: Path, output: Path, carry: Path | None = None) -> None:
         command = [
             sys.executable,

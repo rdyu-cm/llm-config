@@ -97,9 +97,14 @@ provider_overlay() {
   [ "$TARGET" = codex ] && echo "$(provider_home)/config.local.toml" \
     || echo "$(provider_home)/settings.local.json"
 }
+# The marker records what was last installed into this home, so it belongs
+# beside the config it describes rather than in the repository. Keeping it in
+# the checkout made it shared state between every home a single checkout
+# installs into -- including the throwaway homes the test suite installs into,
+# which left the marker describing a config no real home had.
 provider_generated() {
-  [ "$TARGET" = codex ] && echo "$ROOT/.codex/config.generated.toml" \
-    || echo "$ROOT/.claude/settings.generated.json"
+  [ "$TARGET" = codex ] && echo "$(provider_home)/config.generated.toml" \
+    || echo "$(provider_home)/settings.generated.json"
 }
 provider_instructions() {
   [ "$TARGET" = codex ] && echo "$ROOT/AGENTS.global.md:$(provider_home)/AGENTS.md" \

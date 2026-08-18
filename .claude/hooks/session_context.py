@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Inject one compact reminder without performing any external work."""
 
-from __future__ import annotations
-
 import json
 import sys
 

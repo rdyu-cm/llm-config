@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Reject writes that appear to add secret files or credential material."""
 
-from __future__ import annotations
-
 import json
 import re
 import sys
@@ -53,11 +51,12 @@ def main() -> int:
         ) and SENSITIVE_PATH.search(normalized):
             block(f"Portable Claude Code policy blocked writing likely secret file: {normalized}")
             return 0
-    content = "\n".join(
-        value
-        for key in ("content", "new_string", "command")
-        if isinstance((value := tool_input.get(key, "")), str)
-    )
+    values = []
+    for key in ("content", "new_string", "command"):
+        value = tool_input.get(key, "")
+        if isinstance(value, str):
+            values.append(value)
+    content = "\n".join(values)
     for pattern in SECRET_PATTERNS:
         if pattern.search(content):
             block("Portable Claude Code policy blocked text resembling a credential or private key.")

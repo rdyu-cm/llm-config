@@ -507,6 +507,63 @@ class MergeAndBootstrapTests(unittest.TestCase):
             self.assertNotIn("already exists", second.stderr)
             self.assertEqual((home / "mcp-servers").read_text().split(), registered)
 
+    def test_hooks_install_beside_another_tools_hooks(self) -> None:
+        # A machine whose ~/.claude/hooks another tool already populated used to
+        # be an unresolvable conflict, because the directory was linked whole.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            foreign = home / ".claude/hooks/cbm_gate.py"
+            foreign.parent.mkdir(parents=True)
+            foreign.write_text("# another tool's hook\n")
+
+            result = self.bootstrap(home, "--apply", "--target", "claude", stubs=self.stub_clis(root))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((home / ".claude/hooks/command_policy.py").exists())
+            self.assertEqual(foreign.read_text(), "# another tool's hook\n")
+
+    def test_our_own_whole_directory_link_migrates_without_adopt(self) -> None:
+        # Machines installed under the previous layout hold one link for the
+        # whole hooks directory. Re-pointing it at per-entry links resolves to
+        # identical content, so an up-to-date machine must not be told to rerun
+        # with --adopt just to pick up the new layout.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            (home / ".claude").mkdir(parents=True)
+            (home / ".claude/hooks").symlink_to(ROOT / ".claude/hooks")
+
+            result = self.bootstrap(home, "--apply", "--target", "claude", stubs=self.stub_clis(root))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("--adopt", result.stderr)
+            self.assertFalse((home / ".claude/hooks").is_symlink())
+            self.assertEqual(
+                (home / ".claude/hooks/command_policy.py").resolve(),
+                (ROOT / ".claude/hooks/command_policy.py").resolve(),
+            )
+
+    def test_an_unresolved_hook_link_stops_the_config_from_landing(self) -> None:
+        # The installed config declares hooks by path, and a PreToolUse hook
+        # whose interpreter cannot open its script exits 2 -- which Claude Code
+        # reads as "deny this tool call". Installing the config while a hook
+        # link is unresolved therefore locks the provider out of Bash, Edit and
+        # Write entirely, so the config must not land ahead of its links.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            clash = home / ".claude/hooks/command_policy.py"
+            clash.parent.mkdir(parents=True)
+            clash.write_text("# not ours\n")
+
+            result = self.bootstrap(home, "--apply", "--target", "claude", stubs=self.stub_clis(root))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(
+                (home / ".claude/settings.json").exists(),
+                "the config landed while its hooks were unresolved",
+            )
+            self.assertIn("no config was installed", result.stderr)
+            self.assertEqual(clash.read_text(), "# not ours\n")
+
     def test_a_whole_directory_link_is_never_written_through(self) -> None:
         # An older layout linked ~/.agents/skills as one directory. Descending
         # into that link writes entries into the repository it points at.

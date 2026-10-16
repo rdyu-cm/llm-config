@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Read-only planner for requirements, architecture, sequencing, risks, and verification strategy.
-model: claude-fable-5
+model: fable
 tools: Read, Grep, Glob, WebSearch, WebFetch
 permissionMode: plan
 ---

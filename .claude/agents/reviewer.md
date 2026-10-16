@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Read-only reviewer for correctness, security, regressions, and missing tests.
-model: claude-fable-5
+model: fable
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 ---

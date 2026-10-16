@@ -1,7 +1,7 @@
 ---
 name: browser-debugger
 description: Browser-flow investigator that reproduces UI failures and gathers console, network, screenshot, and trace evidence without editing application code.
-model: claude-fable-5
+model: fable
 tools: Read, Grep, Glob, Bash
 permissionMode: default
 ---

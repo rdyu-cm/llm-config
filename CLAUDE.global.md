@@ -10,6 +10,7 @@ Keep changes small, evidence-driven, and directly tied to the request.
 - Before claiming completion, run the relevant formatter, type checker, tests, or smoke checks and report the evidence.
 - Prefer codebase graph tools for symbol and call-path discovery when available and indexed. Fall back to `rg` and targeted reads otherwise.
 - Verify unstable framework, API, product, security, legal, medical, or financial facts against authoritative current sources.
+- Never include the user's email address in any request to an outside source (API parameters, headers, URLs, forms, or "polite pool" contact fields such as Unpaywall/Crossref/NCBI). If a service requires an email, use a placeholder or ask the user first, and pass this rule on to subagents doing outside lookups.
 - Use skills only when their descriptions match the task. Use MCP servers only for capabilities or external context unavailable locally.
 <!-- shared:end -->
 - Delegate only when the user or repository guidance requests it, or when routing file-modifying implementation to an Opus implementer; delegated work must have independent, bounded parts.

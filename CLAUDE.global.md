@@ -6,6 +6,7 @@ Keep changes small, evidence-driven, and directly tied to the request.
 - State material assumptions before implementation. Ask only when a wrong assumption would substantially change the result.
 - Prefer the simplest implementation that satisfies the requirement. Do not add speculative abstractions or unrelated cleanup.
 - Preserve user changes and dirty worktrees. Never use destructive Git commands without explicit authorization.
+- Commit one complete, verified change at a time (a feature, a fix, or a coherent batch of related small edits), never each step or edit. Integrate worktree branches with a squash merge so each change lands on the main branch as a single commit, unless the repository specifies its own merge convention.
 - For bugs, reproduce the failure when practical, fix the cause, and run focused regression checks.
 - Before claiming completion, run the relevant formatter, type checker, tests, or smoke checks and report the evidence.
 - Prefer codebase graph tools for symbol and call-path discovery when available and indexed. Fall back to `rg` and targeted reads otherwise.
@@ -24,6 +25,6 @@ Keep changes small, evidence-driven, and directly tied to the request.
 
 ## Worktrees
 
-Start tracked-file changes in an isolated Git worktree unless already isolated, explicitly asked to work in place, or worktrees are unavailable. Do not edit `main` directly. Verify before merging and obtain explicit approval before local integration.
+Start tracked-file changes in an isolated Git worktree unless already isolated, explicitly asked to work in place, or worktrees are unavailable. Do not edit `main` directly. Verify before merging and obtain explicit approval before local integration, which squash-merges the branch into one commit.
 
 Cross-session scheduling, leases, and repository-wide writer coordination are harness responsibilities, not skill responsibilities.

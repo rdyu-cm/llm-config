@@ -70,7 +70,7 @@ Or ask: "This branch split from main - is that correct?"
 ```
 Implementation complete. What would you like to do?
 
-1. Merge back to <base-branch> locally
+1. Squash-merge back to <base-branch> locally
 2. Push and create a Pull Request
 3. Keep the branch as-is (I'll handle it later)
 4. Discard this work
@@ -101,10 +101,11 @@ Which option?
 MAIN_ROOT=$(git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel)
 cd "$MAIN_ROOT"
 
-# Merge first — verify success before removing anything
+# Squash-merge first so the branch lands as one commit — verify success before removing anything
 git checkout <base-branch>
 git pull
-git merge <feature-branch>
+git merge --squash <feature-branch>
+git commit -m "<one summary of the whole branch>"
 
 # Verify tests on merged result
 <test command>
@@ -112,10 +113,10 @@ git merge <feature-branch>
 # Only after merge succeeds: cleanup worktree (Step 6), then delete branch
 ```
 
-Then: Cleanup worktree (Step 6), then delete branch:
+Then: Cleanup worktree (Step 6), then force-delete branch (a squashed branch is not an ancestor of the base, so `-d` refuses):
 
 ```bash
-git branch -d <feature-branch>
+git branch -D <feature-branch>
 ```
 
 #### Option 2: Push and Create PR
@@ -185,7 +186,7 @@ git worktree prune  # Self-healing: clean up any stale registrations
 
 | Option | Merge | Push | Keep Worktree | Cleanup Branch |
 |--------|-------|------|---------------|----------------|
-| 1. Merge locally | yes | - | - | yes |
+| 1. Merge locally | yes (squash) | - | - | yes (force) |
 | 2. Create PR | - | yes | yes | - |
 | 3. Keep as-is | - | - | yes | - |
 | 4. Discard | - | - | - | yes (force) |
@@ -205,7 +206,7 @@ git worktree prune  # Self-healing: clean up any stale registrations
 - **Fix:** Only cleanup for Options 1 and 4
 
 **Deleting branch before removing worktree**
-- **Problem:** `git branch -d` fails because worktree still references the branch
+- **Problem:** `git branch -D` fails because worktree still references the branch
 - **Fix:** Merge first, remove worktree, then delete branch
 
 **Running git worktree remove from inside the worktree**

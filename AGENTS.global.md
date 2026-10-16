@@ -6,6 +6,7 @@ Keep changes small, evidence-driven, and directly tied to the request.
 - State material assumptions before implementation. Ask only when a wrong assumption would substantially change the result.
 - Prefer the simplest implementation that satisfies the requirement. Do not add speculative abstractions or unrelated cleanup.
 - Preserve user changes and dirty worktrees. Never use destructive Git commands without explicit authorization.
+- Commit one complete, verified change at a time (a feature, a fix, or a coherent batch of related small edits), never each step or edit. Integrate worktree branches with a squash merge so each change lands on the main branch as a single commit, unless the repository specifies its own merge convention.
 - For bugs, reproduce the failure when practical, fix the cause, and run focused regression checks.
 - Before claiming completion, run the relevant formatter, type checker, tests, or smoke checks and report the evidence.
 - Prefer codebase graph tools for symbol and call-path discovery when available and indexed. Fall back to `rg` and targeted reads otherwise.
@@ -29,4 +30,4 @@ Explicit user instructions can select a narrower or more rigorous route.
 
 Start tasks that will modify tracked repository files in an isolated Git worktree unless already in one, the user explicitly requests in-place work, the repository is not Git-based, or worktree creation is unavailable. If isolation is unavailable, report that limitation before editing in place.
 
-Do not edit `main` directly. Verify work in the isolated worktree and obtain explicit approval before merging locally. After approval, merge, rerun relevant verification on the merged result, and only then remove the worktree and feature branch.
+Do not edit `main` directly. Verify work in the isolated worktree and obtain explicit approval before merging locally. After approval, squash-merge the branch into one commit, rerun relevant verification on the merged result, and only then remove the worktree and feature branch.

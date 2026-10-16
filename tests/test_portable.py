@@ -153,6 +153,20 @@ class SharedSkillTests(unittest.TestCase):
         # Emptying the block is the other way to make this test pass.
         self.assertGreater(len(blocks["CLAUDE.global.md"].strip().splitlines()), 5)
 
+    def test_local_integration_squash_merges(self) -> None:
+        # Upstream finishing-a-development-branch does a plain merge, which
+        # lands every branch-local task commit on the base. Re-vendoring it
+        # would silently restore that, so the squash edit must fail here.
+        skill = (ROOT / "skills/finishing-a-development-branch/SKILL.md").read_text(encoding="utf-8")
+        option1 = skill.split("#### Option 1: Merge Locally", 1)[1].split("#### Option 2", 1)[0]
+        self.assertIn("git merge --squash", option1)
+        self.assertIn("git branch -D <feature-branch>", option1)
+        for name in ("CLAUDE.global.md", "AGENTS.global.md"):
+            with self.subTest(file=name):
+                text = (ROOT / name).read_text(encoding="utf-8")
+                block = text.split(SHARED_BEGIN, 1)[1].split(SHARED_END, 1)[0]
+                self.assertIn("squash merge", block)
+
     def test_no_skill_is_duplicated_per_provider(self) -> None:
         skills = {path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")}
         for suffix in ("-codex", "-claude", "_codex", "_claude"):

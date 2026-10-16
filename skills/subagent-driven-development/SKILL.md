@@ -136,11 +136,11 @@ For every dispatch, use Claude Code’s `Agent` tool with a self-contained promp
 
 | Work | Claude Code agent | Model |
 | --- | --- | --- |
-| Complete specification, isolated change, one or two files | `implementer-fast` | `claude-opus-5` |
-| Multi-file integration, pattern matching, or debugging | `implementer-standard` | `claude-opus-5` |
-| Broad architectural context or substantial design judgment | `implementer-deep` | `claude-opus-5` |
-| Small or routine task review | `reviewer-standard` | `claude-fable-5` |
-| Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer-deep` | `claude-fable-5` |
+| Complete specification, isolated change, one or two files | `implementer-fast` | `opus` |
+| Multi-file integration, pattern matching, or debugging | `implementer-standard` | `opus` |
+| Broad architectural context or substantial design judgment | `implementer-deep` | `opus` |
+| Small or routine task review | `reviewer-standard` | `fable` |
+| Subtle, security-sensitive, concurrency-sensitive, or whole-branch review | `reviewer-deep` | `fable` |
 
 ### Codex Agent Tiers
 

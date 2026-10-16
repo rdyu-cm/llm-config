@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Implementation worker for an approved bounded slice with focused tests and concise evidence.
-model: claude-opus-5
+model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
 permissionMode: acceptEdits
 ---

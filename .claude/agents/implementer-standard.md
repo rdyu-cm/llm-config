@@ -1,7 +1,7 @@
 ---
 name: implementer-standard
 description: Standard workflow implementer for multi-file integration and debugging tasks.
-model: claude-opus-5
+model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
 permissionMode: acceptEdits
 ---

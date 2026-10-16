@@ -1,7 +1,7 @@
 ---
 name: reviewer-standard
 description: Read-only workflow reviewer for small or routine task-scoped changes.
-model: claude-fable-5
+model: fable
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 ---

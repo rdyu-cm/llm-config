@@ -1,7 +1,7 @@
 ---
 name: reviewer-deep
 description: Read-only deep reviewer for subtle, high-risk, or whole-branch changes.
-model: claude-fable-5
+model: fable
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 ---

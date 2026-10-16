@@ -187,11 +187,16 @@ manually.
 
 ## Models
 
-Claude Code main sessions default to `claude-opus-5` at high reasoning effort
-(`effortLevel: high`). Planning switches to Fable: the `Plan` and `planner` agents pin
-`claude-fable-5` and inherit the session's high effort. The other non-implementation named
-agents also use `claude-fable-5`, and the four file-modifying roles use `claude-opus-5`:
+Claude Code main sessions default to `opus` at high reasoning effort
+(`effortLevel: high`). Planning switches to Fable: the `Plan` and `planner` agents use
+`fable` and inherit the session's high effort. The other non-implementation named
+agents also use `fable`, and the four file-modifying roles use `opus`:
 `implementer`, `implementer-fast`, `implementer-standard`, and `implementer-deep`.
+
+`opus` and `fable` are Claude Code model aliases rather than pinned version IDs. They
+resolve to the provider's recommended release (currently Opus 5.5 and Fable 5.1) and move
+with new releases, so a new model needs no edit here. To hold a specific version on one
+machine, set `ANTHROPIC_DEFAULT_OPUS_MODEL` or `ANTHROPIC_DEFAULT_FABLE_MODEL`.
 
 `Plan` overrides Claude Code's built-in planning subagent, so planning delegated through either the built-in name or the portable `planner` name switches to Fable. Main sessions do not switch models in place: `CLAUDE.global.md` routes planning to a Fable agent and approved file-modifying work to an Opus implementer while the main session coordinates and verifies it. Claude Code has no setting that changes the model used by plan mode itself (the built-in `opusplan` alias is a fixed Opus/Sonnet pairing), so named-agent delegation is the supported routing mechanism.
 

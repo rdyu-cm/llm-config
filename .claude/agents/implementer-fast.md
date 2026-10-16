@@ -1,7 +1,7 @@
 ---
 name: implementer-fast
 description: Fast workflow implementer for mechanical, fully specified changes limited to one or two files.
-model: claude-opus-5
+model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
 permissionMode: acceptEdits
 ---

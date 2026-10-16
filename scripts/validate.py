@@ -40,8 +40,8 @@ def load_object(path: Path) -> dict:
 
 def main() -> int:
     settings = load_object(ROOT / ".claude/settings.json")
-    if settings.get("model") != "claude-opus-5":
-        fail("Claude default model must be claude-opus-5")
+    if settings.get("model") != "opus":
+        fail("Claude default model must be opus")
     if settings.get("effortLevel") != "high":
         fail("Claude default effortLevel must be high")
     hooks = settings.get("hooks", {})
@@ -72,9 +72,9 @@ def main() -> int:
                 fail(f"{path.relative_to(ROOT)} missing {field}")
         name = metadata["name"]
         model = metadata["model"]
-        if model == "claude-opus-5":
+        if model == "opus":
             actual_opus.add(name)
-        elif model != "claude-fable-5":
+        elif model != "fable":
             fail(f"{name} uses unexpected model {model}")
     if actual_opus != OPUS_AGENTS:
         fail(f"Opus implementation routing mismatch: {sorted(actual_opus)}")

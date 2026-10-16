@@ -1,7 +1,7 @@
 ---
 name: docs-researcher
 description: Read-only researcher that verifies current framework, API, and Claude Code behavior using authoritative documentation.
-model: claude-fable-5
+model: fable
 tools: Read, Grep, Glob, WebSearch, WebFetch
 permissionMode: plan
 ---

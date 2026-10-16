@@ -1,7 +1,7 @@
 ---
 name: implementer-deep
 description: Deep implementation worker for tasks requiring broad context or substantial design judgment.
-model: claude-opus-5
+model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
 permissionMode: acceptEdits
 ---

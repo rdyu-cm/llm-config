@@ -88,7 +88,7 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_opus_is_default_and_planning_agents_use_fable(self) -> None:
         settings = json.loads((ROOT / ".claude/settings.json").read_text(encoding="utf-8"))
-        self.assertEqual(settings["model"], "claude-opus-5")
+        self.assertEqual(settings["model"], "opus")
         self.assertEqual(settings["effortLevel"], "high")
         agents = {
             data["name"]: data
@@ -102,12 +102,12 @@ class ConfigurationTests(unittest.TestCase):
             "implementer-deep",
         }
         self.assertEqual(
-            {name for name, data in agents.items() if data["model"] == "claude-opus-5"},
+            {name for name, data in agents.items() if data["model"] == "opus"},
             implementation,
         )
         self.assertTrue(
             all(
-                data["model"] == "claude-fable-5"
+                data["model"] == "fable"
                 for name, data in agents.items()
                 if name not in implementation
             )

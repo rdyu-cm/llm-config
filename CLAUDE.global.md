@@ -25,6 +25,6 @@ Keep changes small, evidence-driven, and directly tied to the request.
 
 ## Worktrees
 
-Start tracked-file changes in an isolated Git worktree unless already isolated, explicitly asked to work in place, or worktrees are unavailable. Do not edit `main` directly. Verify before merging and obtain explicit approval before local integration, which squash-merges the branch into one commit.
+Start tracked-file changes in an isolated Git worktree unless already isolated, explicitly asked to work in place, or worktrees are unavailable. Do not edit `main` directly. Verify before merging and obtain explicit approval before local integration, which squash-merges the branch into one commit. After the squash merge and verification on the merged result, remove the worktree and force-delete the feature branch without asking again, since approval of the merge covers this cleanup, provided the worktree has no uncommitted or untracked changes and the branch's tree matches the merged result (e.g. `git diff --quiet main <branch>`); otherwise keep both and ask.
 
 Cross-session scheduling, leases, and repository-wide writer coordination are harness responsibilities, not skill responsibilities.

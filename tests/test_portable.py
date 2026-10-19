@@ -180,6 +180,7 @@ class SharedSkillTests(unittest.TestCase):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 block = text.split(SHARED_BEGIN, 1)[1].split(SHARED_END, 1)[0]
                 self.assertIn("squash merge", block)
+                self.assertIn("approval of the merge covers this cleanup", text.lower())
 
     def test_no_skill_is_duplicated_per_provider(self) -> None:
         skills = {path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")}

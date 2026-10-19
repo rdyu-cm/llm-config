@@ -2,6 +2,7 @@
 name: planner
 description: Read-only planner for requirements, architecture, sequencing, risks, and verification strategy.
 model: fable
+effort: high
 tools: Read, Grep, Glob, WebSearch, WebFetch
 permissionMode: plan
 ---

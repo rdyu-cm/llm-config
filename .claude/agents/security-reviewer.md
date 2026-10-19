@@ -2,6 +2,7 @@
 name: security-reviewer
 description: Read-only security reviewer for diffs, insecure defaults, dependency risk, dangerous APIs, and agentic CI workflows.
 model: fable
+effort: high
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 ---

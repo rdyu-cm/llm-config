@@ -187,11 +187,13 @@ manually.
 
 ## Models
 
-Claude Code main sessions default to `opus` at high reasoning effort
-(`effortLevel: high`). Planning switches to Fable: the `Plan` and `planner` agents use
-`fable` and inherit the session's high effort. The other non-implementation named
+Claude Code main sessions default to `opus` at medium reasoning effort
+(`effortLevel: medium`). Planning switches to Fable: the `Plan` and `planner` agents use
+`fable` and pin high effort (`effort: high`), as do the `reviewer`, `reviewer-standard`,
+`reviewer-deep`, and `security-reviewer` agents. The other non-implementation named
 agents also use `fable`, and the four file-modifying roles use `opus`:
 `implementer`, `implementer-fast`, `implementer-standard`, and `implementer-deep`.
+Implementers and the other agents inherit the session effort.
 
 `opus` and `fable` are Claude Code model aliases rather than pinned version IDs. They
 resolve to the provider's recommended release (currently Opus 5.5 and Fable 5.1) and move

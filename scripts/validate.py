@@ -12,6 +12,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OPUS_AGENTS = {"implementer", "implementer-fast", "implementer-standard", "implementer-deep"}
+HIGH_EFFORT_AGENTS = {
+    "planner",
+    "Plan",
+    "reviewer",
+    "reviewer-standard",
+    "reviewer-deep",
+    "security-reviewer",
+}
 
 
 def fail(message: str) -> None:
@@ -42,8 +50,8 @@ def main() -> int:
     settings = load_object(ROOT / ".claude/settings.json")
     if settings.get("model") != "opus":
         fail("Claude default model must be opus")
-    if settings.get("effortLevel") != "high":
-        fail("Claude default effortLevel must be high")
+    if settings.get("effortLevel") != "medium":
+        fail("Claude default effortLevel must be medium")
     hooks = settings.get("hooks", {})
     if not isinstance(hooks, dict) or not {"SessionStart", "PreToolUse"} <= hooks.keys():
         fail("settings.json is missing required hooks")
@@ -65,6 +73,7 @@ def main() -> int:
 
     agents = sorted((ROOT / ".claude/agents").glob("*.md"))
     actual_opus: set[str] = set()
+    actual_high: set[str] = set()
     for path in agents:
         metadata = parse_frontmatter(path)
         for field in ("name", "description", "model", "tools", "permissionMode"):
@@ -76,8 +85,15 @@ def main() -> int:
             actual_opus.add(name)
         elif model != "fable":
             fail(f"{name} uses unexpected model {model}")
+        effort = metadata.get("effort")
+        if effort == "high":
+            actual_high.add(name)
+        elif effort is not None:
+            fail(f"{name} uses unexpected effort {effort}")
     if actual_opus != OPUS_AGENTS:
         fail(f"Opus implementation routing mismatch: {sorted(actual_opus)}")
+    if actual_high != HIGH_EFFORT_AGENTS:
+        fail(f"high-effort planning and review pin mismatch: {sorted(actual_high)}")
 
     with (ROOT / "capability-bundle.toml").open("rb") as handle:
         bundle = tomllib.load(handle)
